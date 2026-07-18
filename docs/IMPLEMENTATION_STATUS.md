@@ -73,7 +73,7 @@
 4. Assertions without approved evidence references cannot compile.
 5. Reviewed content containing apparent personal data cannot compile.
 6. Both recorded target responses are required before validation.
-7. Verified status cannot be set until comparative execution succeeds.
+7. Evaluation-verified status cannot be set until comparative recorded-response execution succeeds; deployed-fix status requires live-system proof.
 8. A Redress Receipt cannot be issued without stored broken/fixed proof.
 9. Developer incident reporting never grants access to another reporter's original narrative or artifacts.
 10. Privileged case state cannot be injected through public intake fields.
@@ -90,7 +90,7 @@ The suite currently covers 23 checks, including:
 - personal-data leak blocking;
 - expected-behavior approval;
 - privacy detection and manual reintroduction detection; and
-- a complete fresh-report lifecycle through verified status.
+- a complete fresh-report lifecycle through evaluation-verified status, including rejection of unsupported deployed-fix claims.
 - signed-role token tamper resistance;
 - evidence dependency invalidation and review queueing;
 - mutation, stability, calibration, and scope assurance;

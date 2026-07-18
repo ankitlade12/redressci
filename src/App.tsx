@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, setApiToken } from "./api";
-import { getCaseOverviewState } from "./case-state";
+import { areReviewTextsEquivalent, getCaseOverviewState, isEvaluationVerified, isPrivateConsent } from "./case-state";
 import { Icon } from "./icons";
 import { parseRoute, routePath, type AppRoute, type Page } from "./routing";
 import type { AssertionResult, EvaluationRun, RedressCase, ResultState } from "./types";
@@ -36,7 +36,7 @@ function Shell({ children, page, onNavigate, onReport, ai, role, roleBusy, onRol
         <span className="avatar">{role.slice(0, 2).toUpperCase()}</span>
         <label><small>VIEW PRIVACY BOUNDARY AS</small><select value={role} disabled={roleBusy} onChange={(event) => onRoleChange(event.target.value as WorkspaceRole)} aria-label="View demo as role">{Object.entries(roleLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
       </div>
-      <div className={`ai-status ${ai ? "online" : ""}`}><span />{ai ? "GPT-5.6 connected" : "Synthetic demo mode"}</div>
+      <div className={`ai-status ${ai ? "online" : ""}`}><span />{ai ? "Live AI configured" : "Synthetic demo mode"}</div>
     </aside>
     <main>{children}</main>
   </div>;
@@ -45,10 +45,11 @@ function Shell({ children, page, onNavigate, onReport, ai, role, roleBusy, onRol
 function Dashboard({ cases, onOpen, onReport, onReset, canReport, canReset }: { cases: RedressCase[]; onOpen: (id: string) => void; onReport: () => void; onReset: () => void; canReport: boolean; canReset: boolean }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"all" | "review" | "verified">("all");
-  const verified = cases.filter((item) => item.status === "Verified fixed").length;
+  const verifiedCases = cases.filter(isEvaluationVerified);
+  const verified = verifiedCases.length;
   const needsReview = cases.length - verified;
   const matchingCases = cases.filter((item) => {
-    const matchesFilter = filter === "all" || (filter === "verified" ? item.status === "Verified fixed" : item.status !== "Verified fixed");
+    const matchesFilter = filter === "all" || (filter === "verified" ? isEvaluationVerified(item) : !isEvaluationVerified(item));
     const haystack = `${item.id} ${item.title} ${item.product} ${item.category}`.toLowerCase();
     return matchesFilter && haystack.includes(query.trim().toLowerCase());
   });
@@ -65,12 +66,12 @@ function Dashboard({ cases, onOpen, onReport, onReset, canReport, canReset }: { 
       <div className="eyebrow"><span /> FROM EXPERIENCE TO PROTECTION</div>
       <h1>Turn AI failures into<br /><em>tests that stay fixed.</em></h1>
       <p>RedressCI gives every reported failure a path to evidence, verification, and permanent regression protection.</p>
-      <div className="hero-actions"><button className="button dark" onClick={() => cases.find((item) => item.status === "Verified fixed") && onOpen(cases.find((item) => item.status === "Verified fixed")!.id)}>Explore the verified demo <Icon name="arrow" size={17} /></button>{canReset && <button className="button quiet" onClick={onReset}><Icon name="refresh" size={17} />Reset demo</button>}</div>
+      <div className="hero-actions"><button className="button dark" disabled={!verifiedCases[0]} onClick={() => verifiedCases[0] && onOpen(verifiedCases[0].id)}>Explore the verified evaluation <Icon name="arrow" size={17} /></button>{canReset && <button className="button quiet" onClick={onReset}><Icon name="refresh" size={17} />Reset demo</button>}</div>
     </section>
     <section className="lifecycle-strip" aria-label="RedressCI workflow">{[["01", "Report", "Capture the affected person’s experience"], ["02", "Review", "Approve privacy, evidence, and expectations"], ["03", "Prove", "Require broken-fails and fixed-passes"], ["04", "Protect", "Export the case into release CI"]].map(([number, label, copy]) => <div key={number}><span>{number}</span><strong>{label}</strong><small>{copy}</small></div>)}</section>
     <section className="metrics" aria-label="Case metrics">
       <div><small>OPEN CASES</small><strong>{String(needsReview).padStart(2, "0")}</strong><span>Awaiting action</span></div>
-      <div><small>VERIFIED FIXED</small><strong>{String(verified).padStart(2, "0")}</strong><span className="positive">↑ Permanent protection</span></div>
+      <div><small>EVALUATIONS VERIFIED</small><strong>{String(verified).padStart(2, "0")}</strong><span className="positive">Broken/fixed distinction proven</span></div>
       <div><small>MEDIAN TO REPRODUCE</small><strong>{medianMinutes ?? "—"}{medianMinutes !== null && <sup>m</sup>}</strong><span>From recorded timelines</span></div>
       <div className="metric-accent"><small>PROTECTED CHECKS</small><strong>{String(protectedChecks).padStart(2, "0")}</strong><span>Passing on corrected targets</span></div>
     </section>
@@ -80,9 +81,9 @@ function Dashboard({ cases, onOpen, onReport, onReset, canReport, canReset }: { 
         <div className="table-head"><span>CASE</span><span>STATUS</span><span>SEVERITY</span><span>LATEST RUN</span><span>UPDATED</span><span /></div>
         {matchingCases.map((item) => <button className="case-row" onClick={() => onOpen(item.id)} key={item.id}>
           <span className="case-title"><i className="category-icon"><Icon name="shield" size={18} /></i><span><strong>{item.title}</strong><small>{item.id} · {item.product}</small></span></span>
-          <span><StatusPill state={item.status === "Verified fixed" ? "verified" : "private"}>{item.status}</StatusPill></span>
+          <span><StatusPill state={isEvaluationVerified(item) ? "verified" : "private"}>{item.status}</StatusPill></span>
           <span><StatusPill state={item.severity}>{item.severity}</StatusPill></span>
-          <span className="run-cell"><i className="pass-dot" />{item.runs[0]?.state === "pass" || item.status === "Verified fixed" ? "Passed on fixed" : "Not run"}</span>
+          <span className="run-cell"><i className="pass-dot" />{item.runs[0]?.state === "pass" || isEvaluationVerified(item) ? "Correction passed" : "Not run"}</span>
           <span className="date-cell">{formatDate(item.updatedAt)}</span>
           <span><Icon name="chevron" size={18} /></span>
         </button>)}
@@ -143,19 +144,19 @@ function CaseDetail({ item, onBack, refresh, role }: { item: RedressCase; onBack
   const [notice, setNotice] = useState("");
   const validate = async () => {
     setRunning(true); setNotice("");
-    try { const result = await api.validate(item.id); setFreshRuns({ broken: result.broken, fixed: result.fixed }); setNotice(result.verified ? "Validation gate passed. The fix is independently verified." : "The targets were not distinguished."); await refresh(); }
+    try { const result = await api.validate(item.id); setFreshRuns({ broken: result.broken, fixed: result.fixed }); setNotice(result.verified ? "Validation gate passed. The recorded correction satisfies the reviewed evaluation; no deployed system was called." : "The recorded targets were not distinguished."); await refresh(); }
     catch (error) { setNotice(error instanceof Error ? error.message : "Validation failed"); }
     finally { setRunning(false); }
   };
   return <div className="page case-page">
     <header className="case-header">
       <button className="back-link" onClick={onBack}>Cases <Icon name="chevron" size={14} /> <span>{item.id}</span></button>
-      <div className="case-head-row"><div><div className="title-meta">{item.synthetic ? <StatusPill state="synthetic">Synthetic demonstration</StatusPill> : <StatusPill state="private">Private report</StatusPill>}<span>Updated {formatDate(item.updatedAt, true)}</span></div><h1>{item.title}</h1><p>{item.description}</p></div><StatusPill state={item.status === "Verified fixed" ? "verified" : "private"}>{item.status}</StatusPill></div>
+      <div className="case-head-row"><div><div className="title-meta">{item.synthetic ? <StatusPill state="synthetic">Synthetic demonstration</StatusPill> : <StatusPill state="private">Private report</StatusPill>}<span>Updated {formatDate(item.updatedAt, true)}</span></div><h1>{item.title}</h1><p>{item.description}</p></div><StatusPill state={isEvaluationVerified(item) ? "verified" : "private"}>{item.status}</StatusPill></div>
       <div className="tabbar" role="tablist">{tabs.map((entry) => <button role="tab" aria-selected={tab === entry.id} className={tab === entry.id ? "active" : ""} onClick={() => setTab(entry.id)} key={entry.id}><Icon name={entry.icon} size={17} />{entry.label}</button>)}</div>
     </header>
     <div className="case-content">
       {notice && <div className="notice"><Icon name="check" size={17} />{notice}</div>}
-      {!item.synthetic && item.status !== "Verified fixed" && <ReviewWorkspace item={item} refresh={refresh} setTab={setTab} role={role} />}
+      {!item.synthetic && !isEvaluationVerified(item) && <ReviewWorkspace item={item} refresh={refresh} setTab={setTab} role={role} />}
       {tab === "overview" && <Overview item={item} setTab={setTab} />}
       {tab === "evidence" && <EvidenceView item={item} />}
       {tab === "evaluation" && <EvaluationView item={item} setTab={setTab} />}
@@ -195,6 +196,10 @@ function ReviewWorkspace({ item, refresh, setTab, role }: { item: RedressCase; r
   };
 
   const compileReviewedCase = async () => {
+    if (areReviewTextsEquivalent(review.expectedBehavior, review.correctedResponse)) {
+      setError("Expected behavior must be a general evaluation rule, not a copy of the recorded corrected response.");
+      return;
+    }
     setBusy(true); setError("");
     try {
       const { evidence } = await api.addEvidence(item.id, {
@@ -245,7 +250,7 @@ function ReviewWorkspace({ item, refresh, setTab, role }: { item: RedressCase; r
   if (!item.evaluation && role !== "reviewer" && role !== "admin") return <section className="review-ready card"><span><Icon name="evidence" /></span><div><strong>Privacy is approved; evidence review is next.</strong><p>An assigned reviewer must approve the source, expected behavior, and assertions before a test can compile.</p></div></section>;
 
   if (!item.evaluation) {
-    const ready = review.sourceTitle.trim() && review.sourceLocator.trim() && review.sourceExcerpt.trim() && review.expectedBehavior.trim() && review.forbidden.trim() && review.required.trim() && review.correctedResponse.trim();
+    const ready = review.sourceTitle.trim() && review.sourceLocator.trim() && review.sourceExcerpt.trim() && review.expectedBehavior.trim() && review.forbidden.trim() && review.required.trim() && review.correctedResponse.trim() && review.audience.trim();
     return <section className="review-workspace card">
       <div className="review-heading"><span className="review-step">REVIEW 2 OF 2</span><div><h2>Design the evidence-backed test</h2><p>Approve the source, define observable checks, and register a corrected response for comparative proof.</p></div><Icon name="evidence" /></div>
       {error && <div className="form-error"><Icon name="alert" size={15} />{error}</div>}
@@ -253,12 +258,13 @@ function ReviewWorkspace({ item, refresh, setTab, role }: { item: RedressCase; r
         <label>Evidence title<input value={review.sourceTitle} onChange={(event) => set("sourceTitle", event.target.value)} placeholder="Policy, dataset, or reviewer-approved requirement" /></label>
         <label>Exact source locator<input value={review.sourceLocator} onChange={(event) => set("sourceLocator", event.target.value)} placeholder="Section 4.2, record ID, or URL fragment" /></label>
         <label className="full">Relevant evidence passage<textarea rows={3} value={review.sourceExcerpt} onChange={(event) => set("sourceExcerpt", event.target.value)} placeholder="Paste only the passage that establishes expected behavior." /></label>
-        <label className="full">Reviewer-approved expected behavior<textarea rows={3} value={review.expectedBehavior} onChange={(event) => set("expectedBehavior", event.target.value)} placeholder="Describe the evidence-supported outcome." /></label>
+        <label className="full">Reviewer-approved expected behavior<textarea rows={3} value={review.expectedBehavior} onChange={(event) => set("expectedBehavior", event.target.value)} placeholder="Describe the evidence-supported rule, not a candidate answer." /><small>Write a general requirement that could grade more than one valid response.</small></label>
         <label>Forbidden phrase or entity<input value={review.forbidden} onChange={(event) => set("forbidden", event.target.value)} placeholder="A value the broken response contains" /></label>
         <label>Required phrase or concept<input value={review.required} onChange={(event) => set("required", event.target.value)} placeholder="A value the corrected response must contain" /></label>
         <label>Broken version<input value={review.brokenVersion} onChange={(event) => set("brokenVersion", event.target.value)} /></label>
         <label>Corrected version<input value={review.correctedVersion} onChange={(event) => set("correctedVersion", event.target.value)} /></label>
-        <label className="full">Recorded corrected response<textarea rows={4} value={review.correctedResponse} onChange={(event) => set("correctedResponse", event.target.value)} placeholder={`Write a response that includes “${review.required || "the required concept"}” and avoids the forbidden behavior.`} /></label>
+        <label className="full">Recorded corrected response<textarea rows={4} value={review.correctedResponse} onChange={(event) => set("correctedResponse", event.target.value)} placeholder={`Write a response that includes “${review.required || "the required concept"}” and avoids the forbidden behavior.`} /><small>This is a concrete candidate output. It must be distinct from the expected-behavior rule.</small></label>
+        <label className="full">Affected audience<input value={review.audience} onChange={(event) => set("audience", event.target.value)} placeholder="Who could encounter or be harmed by this failure?" /></label>
         <label>Failure category<select value={review.category} onChange={(event) => set("category", event.target.value)}><option>Other reviewer-defined failure</option><option>Factual inaccuracy</option><option>Accessibility failure</option><option>Unsafe recommendation</option><option>Citation failure</option><option>Privacy disclosure</option><option>Incorrect tool selection</option></select></label>
         <label>Severity<select value={review.severity} onChange={(event) => set("severity", event.target.value)}><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option></select></label>
       </div>
@@ -266,7 +272,7 @@ function ReviewWorkspace({ item, refresh, setTab, role }: { item: RedressCase; r
     </section>;
   }
 
-  return <section className="review-ready card"><span><Icon name="check" /></span><div><strong>The reviewed test is ready for comparative validation.</strong><p>Run it against both recorded versions. Verified status remains blocked until the broken response fails and the corrected response passes.</p></div><button className="button dark" onClick={() => setTab("validation")}>Open validation <Icon name="arrow" size={15} /></button></section>;
+  return <section className="review-ready card"><span><Icon name="check" /></span><div><strong>The reviewed test is ready for recorded-response validation.</strong><p>The evaluation becomes verified only when the recorded broken response fails and the recorded correction passes. This does not verify a deployed system.</p></div><button className="button dark" onClick={() => setTab("validation")}>Open validation <Icon name="arrow" size={15} /></button></section>;
 }
 
 export function Overview({ item, setTab }: { item: RedressCase; setTab: (tab: CaseTab) => void }) {
@@ -283,7 +289,7 @@ export function Overview({ item, setTab }: { item: RedressCase; setTab: (tab: Ca
     </div>
     <aside className="content-stack">
       <section className="card details-card"><h3>Case details</h3><dl><div><dt>Product</dt><dd>{item.product}</dd></div><div><dt>Category</dt><dd>{item.category}</dd></div><div><dt>Severity</dt><dd><StatusPill state={item.severity}>{item.severity}</StatusPill></dd></div><div><dt>Affected audience</dt><dd>{item.audience}</dd></div><div><dt>Consent</dt><dd>{item.consent}</dd></div></dl></section>
-      <section className="card gate-mini"><div className="card-label"><Icon name="flask" size={16} /> VERIFICATION GATE</div>{state.validation ? <><div className={`mini-result ${state.validation.broken.state}`}><span>Known-broken · {state.validation.broken.targetVersion}</span><strong>{resultSummary(state.validation.broken).label} <Icon name={resultSummary(state.validation.broken).icon} size={15} /></strong></div><div className="gate-line"><span /><Icon name="arrow" size={16} /><span /></div><div className={`mini-result ${state.validation.fixed.state}`}><span>Corrected · {state.validation.fixed.targetVersion}</span><strong>{resultSummary(state.validation.fixed).label} <Icon name={resultSummary(state.validation.fixed).icon} size={15} /></strong></div><p><Icon name="shield" size={16} />{state.validation.verified ? "The broken target failed and the corrected target passed." : "This comparison has not satisfied the verification gate."}</p></> : <div className="gate-pending"><Icon name="flask" size={22} /><strong>{item.evaluation ? "Validation has not run" : "Evaluation not generated"}</strong><span>{item.evaluation ? "Run both approved targets to produce comparative proof." : "Complete privacy and evidence review before generating a test."}</span></div>}<button className="button wide" disabled={!item.evaluation} onClick={() => setTab("validation")}>{item.evaluation ? "Inspect validation" : "Complete review first"}</button></section>
+      <section className="card gate-mini"><div className="card-label"><Icon name="flask" size={16} /> VERIFICATION GATE</div>{state.validation ? <><div className={`mini-result ${state.validation.broken.state}`}><span>Recorded broken · {state.validation.broken.targetVersion}</span><strong>{resultSummary(state.validation.broken).label} <Icon name={resultSummary(state.validation.broken).icon} size={15} /></strong></div><div className="gate-line"><span /><Icon name="arrow" size={16} /><span /></div><div className={`mini-result ${state.validation.fixed.state}`}><span>Recorded correction · {state.validation.fixed.targetVersion}</span><strong>{resultSummary(state.validation.fixed).label} <Icon name={resultSummary(state.validation.fixed).icon} size={15} /></strong></div><p><Icon name="shield" size={16} />{state.validation.verified ? "The recorded broken response failed and the recorded correction passed this evaluation." : "This recorded-response comparison has not satisfied the verification gate."}</p></> : <div className="gate-pending"><Icon name="flask" size={22} /><strong>{item.evaluation ? "Validation has not run" : "Evaluation not generated"}</strong><span>{item.evaluation ? "Run both approved recorded targets to produce comparative proof." : "Complete privacy and evidence review before generating a test."}</span></div>}<button className="button wide" disabled={!item.evaluation} onClick={() => setTab("validation")}>{item.evaluation ? "Inspect validation" : "Complete review first"}</button></section>
     </aside>
   </div>;
 }
@@ -304,20 +310,25 @@ function EvaluationView({ item, setTab }: { item: RedressCase; setTab: (tab: Cas
 }
 
 function ResultColumn({ title, version, run, expected }: { title: string; version: string; run: EvaluationRun; expected: ResultState }) {
-  return <section className={`result-column ${run.state}`}><div className="result-head"><div><span>{title}</span><strong>{version}</strong></div><StatusPill state={run.state}>{run.state === expected ? (run.state === "fail" ? "Failed as expected" : "Passed") : run.state}</StatusPill></div><div className="response-box"><span>TARGET RESPONSE</span><p>{run.response}</p></div><div className="checks">{run.assertionResults.map((result: AssertionResult) => <div key={result.assertionId}><span className={`result-icon ${result.state}`}><Icon name={result.state === "pass" ? "check" : result.state === "fail" ? "close" : "alert"} size={14} /></span><div><strong>{result.label}</strong><small>{result.explanation}</small></div><em>{result.evidenceIds.join(", ")}</em></div>)}</div><footer><span>{run.latencyMs} ms</span><span>{Math.round(run.score * 100)}% score</span><span>{run.promptVersion}</span></footer></section>;
+  const latency = run.latencyMs >= 1000 ? `${(run.latencyMs / 1000).toFixed(2)} s` : `${run.latencyMs} ms`;
+  const promptVersion = run.promptVersion.replace(/^system-prompt@/, "v");
+  return <section className={`result-column ${run.state}`}><div className="result-head"><div><span>{title}</span><strong>{version}</strong></div><StatusPill state={run.state}>{run.state === expected ? (run.state === "fail" ? "Failed as expected" : "Passed") : run.state}</StatusPill></div><div className="response-box"><span>RECORDED RESPONSE</span><p>{run.response}</p></div><div className="checks">{run.assertionResults.map((result: AssertionResult) => <div key={result.assertionId}><span className={`result-icon ${result.state}`}><Icon name={result.state === "pass" ? "check" : result.state === "fail" ? "close" : "alert"} size={14} /></span><div><strong>{result.label}</strong><small>{result.explanation}</small></div><em>{result.evidenceIds.join(", ")}</em></div>)}</div><footer className="run-metrics"><span><small>Latency</small><strong>{latency}</strong></span><span><small>Assertions passed</small><strong>{Math.round(run.score * 100)}%</strong></span><span><small>Grader prompt</small><strong>{promptVersion}</strong></span></footer></section>;
 }
 
-function ValidationView({ item, runs, onRun, running }: { item: RedressCase; runs: { broken: EvaluationRun; fixed: EvaluationRun } | null; onRun: () => void; running: boolean }) {
+export function ValidationView({ item, runs, onRun, running }: { item: RedressCase; runs: { broken: EvaluationRun; fixed: EvaluationRun } | null; onRun: () => void; running: boolean }) {
   const stored = useMemo(() => getCaseOverviewState(item).validation, [item]);
   const available = runs || (stored ? { broken: stored.broken, fixed: stored.fixed } : null);
   const passed = available?.broken.state === "fail" && available.fixed.state === "pass";
-  return <div><div className="validation-title"><div><span className="eyebrow"><span /> COMPARATIVE PROOF</span><h2>The test must catch the failure<br />and recognize the fix.</h2></div><button className="button dark" onClick={onRun} disabled={running || !item.evaluation}><Icon name="refresh" size={17} className={running ? "spin" : ""} />{running ? "Running both targets…" : item.evaluation ? "Run validation gate" : "Generate evaluation first"}</button></div>
-    {available ? <><div className="result-grid"><ResultColumn title="KNOWN-BROKEN TARGET" version={available.broken.targetVersion} run={available.broken} expected="fail" /><ResultColumn title="CORRECTED TARGET" version={available.fixed.targetVersion} run={available.fixed} expected="pass" /></div>{passed ? <div className="gate-success"><span className="success-seal"><Icon name="shield" size={29} /></span><div><span>VALIDATION GATE PASSED</span><h3>This evaluation distinguishes the broken and corrected systems.</h3><p>Publication is allowed because the broken target failed for the intended reason and the corrected target passed every required check.</p></div><StatusPill state="verified">Verified</StatusPill></div> : <div className="gate-warning"><Icon name="alert" size={24} /><div><strong>Validation gate not satisfied</strong><p>The known-broken target must fail and the corrected target must pass before verification.</p></div><StatusPill state="private">Review</StatusPill></div>}</> : <EmptyState title={item.evaluation ? "Run the comparison to generate proof" : "Generate an evaluation before validation"} />}
+  const sharingCopy = isPrivateConsent(item.consent)
+    ? "Technical verification is complete. This case remains private under its current consent scope."
+    : "Technical verification is complete. Any sharing remains limited to the approved consent scope and publication review.";
+  return <div><div className="validation-title"><div><span className="eyebrow"><span /> RECORDED-RESPONSE PROOF</span><h2>The test must catch the failure<br />and recognize the correction.</h2><p>This gate compares reviewer-approved recorded responses; it does not call a deployed system.</p></div><button className="button dark" onClick={onRun} disabled={running || !item.evaluation}><Icon name="refresh" size={17} className={running ? "spin" : ""} />{running ? "Running both targets…" : item.evaluation ? "Run validation gate" : "Generate evaluation first"}</button></div>
+    {available ? <><div className="result-grid"><ResultColumn title="RECORDED BROKEN RESPONSE" version={available.broken.targetVersion} run={available.broken} expected="fail" /><ResultColumn title="RECORDED CORRECTED RESPONSE" version={available.fixed.targetVersion} run={available.fixed} expected="pass" /></div>{passed ? <div className="gate-success"><span className="success-seal"><Icon name="shield" size={29} /></span><div><span>VALIDATION GATE PASSED · RECORDED TARGETS</span><h3>This evaluation distinguishes the recorded broken and corrected responses.</h3><p>{sharingCopy}</p></div><StatusPill state="verified">Evaluation verified</StatusPill></div> : <div className="gate-warning"><Icon name="alert" size={24} /><div><strong>Validation gate not satisfied</strong><p>The recorded broken response must fail and the recorded correction must pass before the evaluation is verified.</p></div><StatusPill state="private">Review</StatusPill></div>}</> : <EmptyState title={item.evaluation ? "Run the comparison to generate proof" : "Generate an evaluation before validation"} />}
   </div>;
 }
 
 function TimelineView({ item }: { item: RedressCase }) {
-  return <div className="content-narrow"><div className="view-title"><div><span className="eyebrow"><span /> VISIBLE CLOSURE</span><h2>From report to verified fix.</h2><p>A reporter-safe record of what happened and what was proven.</p></div></div><div className="timeline">{item.timeline.map((event, index) => <div className="timeline-item" key={event.id}><div className="timeline-rail"><span className={event.complete ? "complete" : ""}>{event.complete ? <Icon name="check" size={14} /> : index + 1}</span></div><div className="timeline-card"><div><strong>{event.label}</strong><time>{formatDate(event.createdAt, true)}</time></div><p>{event.detail}</p><small>{event.actor}</small></div></div>)}</div></div>;
+  return <div className="content-narrow"><div className="view-title"><div><span className="eyebrow"><span /> VISIBLE CLOSURE</span><h2>From report to verified evaluation.</h2><p>A reporter-safe record of what happened, what was reviewed, and what was proven.</p></div></div><div className="timeline">{item.timeline.map((event, index) => <div className="timeline-item" key={event.id}><div className="timeline-rail"><span className={event.complete ? "complete" : ""}>{event.complete ? <Icon name="check" size={14} /> : index + 1}</span></div><div className="timeline-card"><div><strong>{event.label}</strong><time>{formatDate(event.createdAt, true)}</time></div><p>{event.detail}</p><small>{event.actor}</small></div></div>)}</div></div>;
 }
 
 function CIView({ item }: { item: RedressCase }) {

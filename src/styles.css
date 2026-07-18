@@ -139,6 +139,7 @@ main { min-width: 0; }
 .review-step { color: var(--green); background: var(--green-light); border-radius: 5px; padding: 6px 8px; font: 500 8px "DM Mono"; letter-spacing: .08em; white-space: nowrap; }
 .redaction-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 20px; }
 .redaction-grid label, .review-form-grid label { display: grid; gap: 7px; color: var(--ink); font-size: 10px; font-weight: 600; }
+.review-form-grid label > small { color: var(--muted); font-size: 9px; font-weight: 400; line-height: 1.45; }
 .redaction-grid label > span { color: var(--muted); font: 500 8px "DM Mono"; letter-spacing: .1em; }
 .redaction-grid textarea, .review-form-grid input, .review-form-grid textarea, .review-form-grid select { width: 100%; border: 1px solid var(--line); border-radius: 7px; background: #fbfaf6; color: var(--ink); padding: 10px 11px; resize: vertical; }
 .redaction-grid textarea[readonly] { color: #6e5d57; background: #f8efec; }
@@ -225,6 +226,7 @@ main { min-width: 0; }
 .code-panel pre { margin: 0; padding: 22px; max-height: 570px; overflow: auto; white-space: pre-wrap; color: #c9d5ce; font: 10px/1.75 "DM Mono", monospace; }
 .validation-title { max-width: 1100px; margin: 0 auto 27px; display: flex; justify-content: space-between; align-items: end; gap: 20px; }
 .validation-title h2 { margin-bottom: 0; }
+.validation-title p { max-width: 620px; margin: 9px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
 .result-grid { max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
 .result-column { border: 1px solid var(--line); border-top-width: 3px; border-radius: 10px; background: var(--card); overflow: hidden; }
 .result-column.fail { border-top-color: var(--red); }
@@ -246,7 +248,11 @@ main { min-width: 0; }
 .checks strong { font-size: 10px; }
 .checks small { margin-top: 3px; color: var(--muted); font-size: 9px; line-height: 1.4; }
 .checks em { color: var(--green); font: 8px "DM Mono"; font-style: normal; }
-.result-column footer { padding: 11px 17px; display: flex; gap: 14px; color: var(--muted); background: #f7f6f1; font: 8px "DM Mono"; }
+.result-column footer.run-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); background: #f7f6f1; border-top: 1px solid var(--line); }
+.run-metrics > span { min-width: 0; padding: 12px 16px 13px; display: grid; gap: 4px; }
+.run-metrics > span + span { border-left: 1px solid var(--line); }
+.run-metrics small { color: var(--muted); font: 500 7px "DM Mono"; letter-spacing: .09em; text-transform: uppercase; }
+.run-metrics strong { color: var(--ink); font: 600 10px "DM Mono"; overflow-wrap: anywhere; }
 .gate-success { max-width: 1100px; margin: 20px auto 0; padding: 22px; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 17px; border: 1px solid #b9d2c1; border-radius: 10px; background: var(--green-light); }
 .success-seal { width: 54px; height: 54px; display: grid; place-items: center; color: white; background: var(--green); border-radius: 50%; box-shadow: 0 0 0 5px rgba(20,107,72,.1); }
 .gate-success > div > span { color: var(--green); font: 500 8px "DM Mono"; letter-spacing: .12em; }
@@ -404,11 +410,11 @@ main { min-width: 0; }
 }
 
 @media (max-width: 700px) {
-  .app-shell { display: block; padding-bottom: 66px; }
-  .sidebar { position: fixed; inset: auto 0 0; width: 100%; height: 66px; padding: 8px 18px; flex-direction: row; border: 0; border-top: 1px solid var(--line); z-index: 30; }
+  .app-shell { display: block; padding-bottom: calc(66px + env(safe-area-inset-bottom)); }
+  .sidebar { position: fixed; inset: auto 0 0; width: 100%; height: calc(66px + env(safe-area-inset-bottom)); padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); flex-direction: row; border: 0; border-top: 1px solid var(--line); z-index: 30; }
   .sidebar .logo, .sidebar-spacer, .workspace-card, .ai-status { display: none; }
-  .sidebar nav { width: 100%; margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .sidebar nav button, .sidebar nav button:not(.active) { justify-content: center; font-size: 10px; }
+  .sidebar nav { width: 100%; margin: 0; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 4px; }
+  .sidebar nav button, .sidebar nav button:not(.active) { justify-content: center; padding: 7px 4px; font-size: 9px; }
   .topbar { height: 66px; }
   .top-actions { width: 100%; }
   .case-search { min-width: 0; flex: 1; }

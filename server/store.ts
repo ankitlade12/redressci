@@ -34,12 +34,19 @@ if (persistenceFile && existsSync(persistenceFile)) {
   const saved = JSON.parse(readFileSync(persistenceFile, "utf8")) as RedressCase[];
   for (const item of saved) cases.set(item.id, {
     ...item,
+    status: item.status === "Verified fixed" ? "Evaluation verified" : item.status,
     intakeType: item.intakeType || "affected-person",
     artifacts: item.artifacts || [],
     redactedTitle: item.redactedTitle || item.title,
     redactedDescription: item.redactedDescription || item.description,
     redactedUserInput: item.redactedUserInput || item.userInput,
     redactedObservedResponse: item.redactedObservedResponse || item.observedResponse,
+    timeline: item.timeline.map((event) => event.label === "Fix independently verified" ? {
+      ...event,
+      label: "Recorded correction verified",
+      detail: "The recorded broken response failed and the recorded corrected response passed this evaluation. No deployed system was called.",
+      actor: "RedressCI validation gate",
+    } : event),
   });
 } else resetStore();
 

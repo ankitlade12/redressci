@@ -54,6 +54,17 @@ test("a fresh report completes privacy, evidence, compilation, and comparative v
     audience: "People with mobility requirements",
     reviewer: "Test reviewer",
   }));
+
+  const overfitTarget = await post(`/api/cases/${id}/targets`, {
+    brokenResponse: "Use Central Hall.",
+    correctedResponse: "Recommend River Library and do not recommend Central Hall.",
+    brokenVersion: "guide@broken",
+    correctedVersion: "guide@fixed",
+    reviewer: "Test reviewer",
+  }, "PUT");
+  assert.equal(overfitTarget.status, 400);
+  assert.match(String((await overfitTarget.json() as { error?: string }).error), /distinct|different/i);
+
   await json(await post(`/api/cases/${id}/assertions`, { assertions: [
     { id: "AS-1", type: "forbidden_entity", value: "Central Hall", label: "Do not recommend Central Hall", evidenceIds: [evidenceId], deterministic: true },
     { id: "AS-2", type: "required_concept", value: "River Library", label: "Recommend River Library", evidenceIds: [evidenceId], deterministic: true },
@@ -73,6 +84,10 @@ test("a fresh report completes privacy, evidence, compilation, and comparative v
   assert.equal(validation.fixed.state, "pass");
 
   const completed = await json(await fetch(`${base}/api/cases/${id}`)) as { case: { status: string; evaluation: { status: string } } };
-  assert.equal(completed.case.status, "Verified fixed");
+  assert.equal(completed.case.status, "Evaluation verified");
   assert.equal(completed.case.evaluation.status, "verified");
+
+  const deployedClaim = await post(`/api/cases/${id}/status`, { status: "Verified fixed" });
+  assert.equal(deployedClaim.status, 409);
+  assert.match(String((await deployedClaim.json() as { error?: string }).error), /live system adapter/i);
 });

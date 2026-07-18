@@ -44,7 +44,7 @@ export function createDemoCase(): RedressCase {
     severity: "high",
     audience: "Wheelchair users seeking public cooling services",
     environment: "Web chatbot · English · synthetic city service data",
-    status: "Verified fixed",
+    status: "Evaluation verified",
     synthetic: true,
     artifacts: [],
     evidence: [
@@ -141,7 +141,7 @@ export function createDemoCase(): RedressCase {
       { id: "T2", label: "Privacy approved", detail: "Personal details were removed before developer review.", actor: "Maya C.", createdAt: "2026-07-18T14:18:00.000Z", complete: true },
       { id: "T3", label: "Evidence reviewed", detail: "A reviewer confirmed the official facility accessibility records.", actor: "Reviewer", createdAt: "2026-07-18T14:42:00.000Z", complete: true },
       { id: "T4", label: "Problem reproduced", detail: "The test caught the inaccessible recommendation in version 1.3.", actor: "RedressCI", createdAt: "2026-07-18T15:10:00.000Z", complete: true },
-      { id: "T5", label: "Fix independently verified", detail: "Version 1.4 now recommends an accessible facility and the regression test passes.", actor: "Reviewer", createdAt: now, complete: true },
+      { id: "T5", label: "Recorded correction verified", detail: "The recorded version 1.3 response failed and the recorded version 1.4 response passed this evaluation. No deployed system was called.", actor: "RedressCI validation gate", createdAt: now, complete: true },
     ],
     questions: ["Should future tests also cover facilities whose accessibility status is temporarily unknown?"],
     createdAt: "2026-07-18T14:05:00.000Z",

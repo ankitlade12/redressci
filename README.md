@@ -23,7 +23,7 @@ experience → privacy review → approved evidence → portable test
            → broken/fixed proof → reporter closure → CI protection
 ```
 
-The central invariant is enforced in application logic: a case cannot become verified unless the same evaluation **fails on a known-broken target and passes on a corrected target**.
+The central invariant is enforced in application logic: an evaluation cannot become verified unless it **fails on a known-broken response and passes on a corrected response**. Recorded-response proof is labeled separately from deployed-system verification.
 
 ## Judge quickstart
 
@@ -36,7 +36,7 @@ npm run dev
 
 Open [http://localhost:5173](http://localhost:5173). No login, API key, or proprietary target is needed for the synthetic judge path.
 
-1. Select **Explore the verified demo**.
+1. Select **Explore the verified evaluation**.
 2. Inspect the experience, privacy state, approved evidence, and compiled evaluation.
 3. Open **Validation** and select **Run validation gate**.
 4. See version 1.3 fail and version 1.4 pass for evidence-linked reasons.
@@ -52,7 +52,7 @@ To exercise the full fresh-report lifecycle, select **Report a failure** and use
 4. Register the reported broken response and a candidate corrected response.
 5. Compile the portable test and run the comparative gate.
 
-This path uses the same application rules as the seeded demonstration; verified status is not preassigned.
+This path uses the same application rules as the seeded demonstration; evaluation-verified status is not preassigned and does not claim that a deployed system was called.
 
 ## Commands
 
@@ -272,7 +272,7 @@ For a managed production environment, apply [the PostgreSQL migration](db/migrat
 - Evidence changes invalidate dependent assertions, evaluations, packs, and receipts instead of silently preserving stale assurance.
 - Signed proof and receipt verification fails after payload tampering.
 - Aggregate fingerprint groups below the workspace privacy threshold are suppressed.
-- “Verified” means one scoped behavior passed comparative validation; it is not a system-wide safety certification.
+- “Evaluation verified” means one scoped test distinguished approved recorded responses; it does not prove a deployed fix or provide a system-wide safety certification.
 - The MVP never names a real organization or uses a real high-consequence case.
 
 ## How Codex shaped the project

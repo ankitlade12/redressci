@@ -496,9 +496,9 @@ export function publicCase(item: RedressCase) {
 }
 
 export function calculateSlo(item: RedressCase): SloRecord {
-  const at = (label: string) => new Date(item.timeline.find((entry) => entry.label === label)?.createdAt || item.createdAt).getTime();
+  const at = (...labels: string[]) => new Date(item.timeline.find((entry) => labels.includes(entry.label))?.createdAt || item.createdAt).getTime();
   const minutes = (start: number, end: number) => Math.max(0, Math.round((end - start) / 60_000));
-  const report = at("Report received"), privacy = at("Privacy approved"), reproduced = at("Problem reproduced"), fixed = at("Fix independently verified");
+  const report = at("Report received"), privacy = at("Privacy approved"), reproduced = at("Problem reproduced"), fixed = at("Recorded correction verified", "Fix independently verified");
   const targetMinutes = item.severity === "critical" ? 240 : item.severity === "high" ? 1440 : 4320;
   const total = minutes(report, fixed);
   return { caseId: item.id, reportToPrivacyMinutes: minutes(report, privacy), privacyToReproductionMinutes: minutes(privacy, reproduced), reproductionToFixMinutes: minutes(reproduced, fixed), fixToNotificationMinutes: 0, targetMinutes, breached: total > targetMinutes };

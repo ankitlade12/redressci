@@ -48,6 +48,7 @@ import {
 import { readEncryptedArtifact, storeEncryptedArtifact } from "./secure-storage.js";
 import { createCase, getCase, listCases, parseTranscript, resetStore, saveCase } from "./store.js";
 import type { Assertion } from "../src/types.js";
+import { areReviewTextsEquivalent } from "../src/case-state.js";
 import type { SignedProofBundle, WorkspaceRole } from "../src/platform-types.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -329,6 +330,7 @@ app.put("/api/cases/:id/targets", requireRole("reviewer", "developer", "admin"),
   if (!item) return response.status(404).json({ error: "Case not found" });
   const { brokenResponse: broken, correctedResponse: corrected } = request.body;
   if (!broken?.trim() || !corrected?.trim()) return response.status(400).json({ error: "Both recorded target responses are required." });
+  if (areReviewTextsEquivalent(item.expectedBehavior, corrected)) return response.status(400).json({ error: "Expected behavior and the recorded corrected response must be distinct. Define a general evaluation rule, then provide a concrete response to test against it." });
   item.targetPair = {
     brokenResponse: broken.trim(),
     correctedResponse: corrected.trim(),
@@ -381,10 +383,10 @@ app.post("/api/cases/:id/validate", requireRole("reviewer", "developer", "admin"
     item.runs = [fixed, broken, ...item.runs].slice(0, 20);
     item.evaluation.validation = { brokenRunId: broken.id, correctedRunId: fixed.id };
     item.evaluation.status = verified ? "verified" : "reviewed";
-    item.status = verified ? "Verified fixed" : "Ready for verification";
-    item.timeline.push({ id: randomUUID(), label: verified ? "Fix independently verified" : "Validation needs review", detail: verified ? "The test failed on the broken version and passed on the corrected version." : "The comparison did not distinguish the two target versions.", actor: "RedressCI validation gate", createdAt: new Date().toISOString(), complete: verified });
+    item.status = verified ? "Evaluation verified" : "Ready for verification";
+    item.timeline.push({ id: randomUUID(), label: verified ? "Recorded correction verified" : "Validation needs review", detail: verified ? "The recorded broken response failed and the recorded corrected response passed this evaluation. No deployed system was called." : "The recorded-response comparison did not distinguish the two target versions.", actor: "RedressCI validation gate", createdAt: new Date().toISOString(), complete: verified });
     saveCase(item);
-    response.json({ verified, broken, fixed, gate: { requiresBrokenFailure: true, requiresFixedPass: true } });
+    response.json({ verified, broken, fixed, gate: { requiresBrokenFailure: true, requiresFixedPass: true, verificationScope: "recorded-responses", deploymentVerified: false } });
   } catch (error) { next(error); }
 });
 
@@ -411,7 +413,8 @@ app.post("/api/cases/:id/status", requireRole("reporter", "reviewer", "developer
   if (!item) return response.status(404).json({ error: "Case not found" });
   if (request.identity?.role === "reporter" && (item.reporterId !== request.identity.id || request.body.status !== "Withdrawn")) return response.status(403).json({ error: "Reporters may only withdraw their own case." });
   if (request.identity?.role === "developer" && !["Fix in progress", "Ready for verification"].includes(request.body.status)) return response.status(403).json({ error: "Developers may only move a case through fix implementation states." });
-  if (request.body.status === "Verified fixed" && item.evaluation?.status !== "verified") return response.status(409).json({ error: "The broken-versus-fixed gate must pass before this case can be marked verified." });
+  if (request.body.status === "Verified fixed") return response.status(409).json({ error: "Verified fixed requires a successful run against a configured live system adapter. A recorded-response comparison can only mark the evaluation verified." });
+  if (request.body.status === "Evaluation verified" && item.evaluation?.status !== "verified") return response.status(409).json({ error: "The recorded broken-versus-corrected gate must pass before this evaluation can be marked verified." });
   item.status = request.body.status;
   saveCase(item);
   response.json({ case: item });

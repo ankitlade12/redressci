@@ -5,7 +5,7 @@
 
 ## 0:00–0:18 — The failure
 
-**Screen:** Landing page, then open the verified demo.
+**Screen:** Landing page, then open the verified evaluation.
 
 **Narration:**
 
@@ -35,7 +35,7 @@
 
 **Narration:**
 
-“A plausible test is not enough. RedressCI runs the same case against the known-broken and corrected systems. Version 1.3 fails because it recommends Central Hall and omits the accessible option. Version 1.4 passes because it recommends River Library and grounds the answer in the approved facility record. The application blocks a verified badge unless both outcomes occur.”
+“A plausible test is not enough. RedressCI runs the same case against reviewer-approved recorded responses. The recorded version 1.3 response fails because it recommends Central Hall and omits the accessible option. The recorded version 1.4 response passes because it recommends River Library and grounds the answer in the approved facility record. The application labels this as evaluation verification; deployed-fix verification requires a live adapter run.”
 
 ## 1:58–2:27 — Closure and CI
 

@@ -6,6 +6,7 @@ export type CaseStatus =
   | "Reproduced"
   | "Fix in progress"
   | "Ready for verification"
+  | "Evaluation verified"
   | "Verified fixed"
   | "Regression detected"
   | "Rejected"

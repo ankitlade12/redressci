@@ -4,8 +4,8 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { runEvaluation } from "../server/evaluation.js";
 import { createDemoCase } from "../server/fixtures.js";
-import { Overview } from "./App.js";
-import { getCaseOverviewState } from "./case-state.js";
+import { Overview, ValidationView } from "./App.js";
+import { areReviewTextsEquivalent, getCaseOverviewState } from "./case-state.js";
 
 test("pending intake never claims privacy, evidence, or validation approval", () => {
   const item = createDemoCase();
@@ -66,4 +66,28 @@ test("pending Overview renders no premature approval or verification claims", ()
   assert.doesNotMatch(html, /Privacy review approved/);
   assert.doesNotMatch(html, /Evidence-backed/);
   assert.doesNotMatch(html, /Known-broken/);
+});
+
+test("review rules and corrected targets must be meaningfully distinct records", () => {
+  assert.equal(areReviewTextsEquivalent("Recommend a step-free location.", " recommend a step-free location "), true);
+  assert.equal(areReviewTextsEquivalent("Recommend a verified step-free location.", "River Library has verified step-free access."), false);
+});
+
+test("private recorded-response validation never claims publication or a deployed fix", () => {
+  const item = createDemoCase();
+  const evaluation = item.evaluation!;
+  const broken = runEvaluation(evaluation, "broken");
+  const fixed = runEvaluation(evaluation, "fixed");
+  item.consent = "Private to reporter";
+  item.runs = [fixed, broken];
+  evaluation.validation = { brokenRunId: broken.id, correctedRunId: fixed.id };
+
+  const html = renderToStaticMarkup(createElement(ValidationView, { item, runs: null, onRun: () => undefined, running: false }));
+  assert.match(html, /recorded broken and corrected responses/i);
+  assert.match(html, /remains private under its current consent scope/i);
+  assert.match(html, /Evaluation verified/);
+  assert.match(html, /Assertions passed/);
+  assert.match(html, /Grader prompt/);
+  assert.doesNotMatch(html, /Publication is allowed/i);
+  assert.doesNotMatch(html, /independently verified/i);
 });
