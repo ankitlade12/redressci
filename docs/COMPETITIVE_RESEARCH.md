@@ -94,6 +94,8 @@ Avoid high-consequence autonomous decisions and broad consumer-model safety clai
 
 ## Novel feature concepts
 
+**Implementation update:** all ten concepts now have executable foundations in the repository. The Redress Receipt, evidence graph, mutation lab, fingerprints, escrow, counterfactual workflow, SLO/recurrence ledger, maintainer governance, proof interoperability, and fix-scope guard are available through the API; the highest-signal metrics are visible in the Assurance Network interface. External partner validation remains separate from implementation.
+
 ### 1. Redress Receipt
 
 A tamper-evident, privacy-safe artifact delivered to the reporter after verification. It states what behavior was tested, which evidence supported it, the broken and corrected versions, who approved the case, and the hash of the portable evaluation. It does not expose source artifacts or secrets.
@@ -154,6 +156,21 @@ After a case passes, automatically run the relevant evaluation pack and compare 
 
 **Why it matters:** “fixed this one example” is weaker than “fixed the mechanism without collateral damage.”
 
+### Implementation map
+
+| Novel capability | Executable surface |
+| --- | --- |
+| Redress Receipt | Signed receipt endpoint plus signature verifier |
+| Evidence dependency graph | Version, dependency, invalidation, and review-queue APIs |
+| Evaluation mutation lab | Assurance suite and mutation detection report |
+| Failure fingerprints | Privacy-safe digest endpoint and thresholded pattern report |
+| Sealed evaluation escrow | Encrypted partner escrow endpoint |
+| Reporter-controlled counterfactuals | Proposed/approved/rejected variation workflow |
+| Remediation SLO and recurrence | SLO endpoint, recurrence ledger, and release-policy audit event |
+| Community maintainer protocol | Pack stewards, disclosure, compensation, locale, and accessibility metadata |
+| Proof interoperability | Ed25519 bundle, TypeScript SDK, CI, LangSmith, Braintrust, Langfuse, and OECD exports |
+| Fix-scope guard | Neighbor evaluation report inside the assurance suite |
+
 ## Defensibility
 
 The moat will not be the JSON schema or an LLM prompt. It can grow from:
@@ -183,4 +200,3 @@ RedressCI is strongest when framed as **accountable remediation infrastructure**
 2. Every assertion is traceable to approved evidence.
 3. Verification requires a broken failure and corrected pass.
 4. Closure produces both a reporter-readable receipt and a developer-runnable regression test.
-

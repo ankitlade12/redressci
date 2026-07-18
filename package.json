@@ -8,7 +8,8 @@
     "dev": "concurrently -k -n api,web -c cyan,green \"node --watch --import tsx server/index.ts\" \"vite\"",
     "build": "tsc --noEmit && vite build",
     "start": "node --import tsx server/index.ts --production",
-    "test": "node --import tsx --test server/api.test.ts server/compiler.test.ts server/privacy.test.ts server/workflow.test.ts runner/evaluation.test.ts",
+    "auth:token": "node --import tsx scripts/issue-token.ts",
+    "test": "node --import tsx --test server/api.test.ts server/compiler.test.ts server/platform.test.ts server/privacy.test.ts server/workflow.test.ts runner/evaluation.test.ts",
     "test:ci": "node --import tsx runner/cli.ts evals/cooling-center-accessibility-001.json --target fixed",
     "lint": "tsc --noEmit"
   },

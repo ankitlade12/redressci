@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: redressci
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: REDRESSCI_AUTH_SECRET
+        generateValue: true
+      - key: REDRESSCI_STORAGE_KEY
+        generateValue: true
+      - key: REDRESSCI_ESCROW_KEY
+        generateValue: true
+      - key: REDRESSCI_PERSIST
+        value: "1"
+      - key: REDRESSCI_STORAGE_REGION
+        value: us

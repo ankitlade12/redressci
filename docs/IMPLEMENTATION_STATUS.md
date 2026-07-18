@@ -19,6 +19,48 @@
 - Hybrid grading: deterministic checks locally and GPT-5.6 semantic grading when configured.
 - Enforced comparative gate: broken must fail and corrected must pass.
 - Reporter-safe timeline, portable case export, CI runner, and Redress Receipt.
+- Assurance Network dashboard spanning roadmap phases 1–4.
+- Ed25519-signed receipts and portable proof bundles with built-in verification.
+
+## All-phase engineering foundation
+
+### Phase 1 — Design-partner pilot
+
+- HMAC-signed bearer identities and enforced reporter/reviewer/developer/admin/partner roles.
+- Append-only consent history with explicit withdrawal.
+- AES-256-GCM private artifact storage and region metadata.
+- Optional durable local state with atomic writes plus a complete PostgreSQL migration under `db/migrations/`.
+- Evidence versions, exact assertion/evaluation dependencies, invalidation, and re-review queue.
+- Idempotent evaluation jobs.
+- Recorded, allowlisted HTTPS, and OpenAI-compatible adapter definitions with server-side secret references.
+- LangSmith, Braintrust, Langfuse, and OECD-compatible exports.
+
+### Phase 2 — Assurance engine
+
+- Mutation lab with detection rate and severity-aware success policy.
+- Deterministic/model decision calibration and inconclusive-rate reporting.
+- Repeat-run stability with a Wilson 95% confidence interval.
+- Severity-specific inconclusive and repeat-run policies.
+- Neighboring privacy/fix-scope guard.
+- Multi-turn/tool-trajectory schema and deterministic tool assertions.
+- Evidence pins, Ed25519 proof bundles, and a hash-chained audit log.
+
+### Phase 3 — Community evaluation packs
+
+- Privacy-preserving mechanism fingerprints that exclude raw report text.
+- Reviewer-controlled phrasing, language, location, and assistive-need variations.
+- Semantic-versioned packs with changelogs, dependency locks, locales, WCAG target, maintainers, conflict disclosures, and compensation records.
+- AES-256-GCM sealed evaluation escrow for an independent partner.
+- OECD-compatible incident export and consent-gated anonymized public case responses.
+
+### Phase 4 — Remediation network
+
+- Workspace retention, region, SSO requirement, severity, and release-blocking policies.
+- TypeScript interoperability SDK.
+- GitHub, GitLab, Jira, Linear, Slack, Teams, and webhook integration model with audited deliveries.
+- Remediation SLO calculation, recurrence ledger, and release-blocking event metadata.
+- Pattern reports with minimum-group suppression to reduce re-identification risk.
+- Independent verifier role and operational regulatory crosswalks with explicit non-legal notices.
 
 ## Enforced invariants
 
@@ -33,7 +75,7 @@
 
 ## Automated verification
 
-The suite currently covers:
+The suite currently covers 21 checks, including:
 
 - broken-target failure and corrected-target success;
 - validation-gate ordering;
@@ -44,6 +86,12 @@ The suite currently covers:
 - expected-behavior approval;
 - privacy detection and manual reintroduction detection; and
 - a complete fresh-report lifecycle through verified status.
+- signed-role token tamper resistance;
+- evidence dependency invalidation and review queueing;
+- mutation, stability, calibration, and scope assurance;
+- signed proof verification and tamper detection;
+- counterfactual review, sealed escrow, interoperability exports, and privacy thresholding; and
+- all-phase API surfaces and role denial.
 
 Run:
 
@@ -53,23 +101,21 @@ npm run test:ci
 npm run build
 ```
 
-## Intentional MVP boundaries
+## Runtime modes and remaining external milestones
 
-- Case state is in memory for deterministic demo reset.
-- Roles are represented in workflow metadata but not authenticated.
-- Original artifacts use a local private directory rather than encrypted object storage.
-- Generic HTTP targets are represented by recorded responses; live outbound target execution is not enabled because SSRF allowlisting and secret management need production infrastructure.
+- Default judge mode is resettable and credential-free. `REDRESSCI_PERSIST=1` enables atomic durable snapshots.
+- The PostgreSQL schema is production-ready, but a managed database must be provisioned before replacing the local adapter in a hosted environment.
+- Artifacts are encrypted locally; a production deployment should connect the same metadata boundary to a managed regional object store and KMS.
+- Live HTTP execution is disabled until operators provide an HTTPS hostname allowlist and server-side secret environment variable.
 - The offline runner does not call a model grader. It keeps semantic checks inconclusive unless locally decidable.
-- Public publication and real-world consequential cases remain out of scope.
+- SSO policy is modeled and enforced as workspace configuration; connecting an actual identity provider requires organization credentials.
+- Public publication, independent partner identity, reviewer compensation, and real design-partner cases require external people and cannot be manufactured in code.
+- The hosted demo URL and narrated video require deployment and recording accounts.
 
-## Next engineering milestone
+## Next operational milestone
 
-Build the design-partner foundation:
-
-1. PostgreSQL schema and migrations for cases, evidence, approvals, targets, runs, receipts, and audit events.
-2. Authenticated reporter, reviewer, and developer roles.
-3. Encrypted object storage with retention and deletion jobs.
-4. Background evaluation queue with idempotency keys.
-5. Allowlisted HTTP target adapter with server-side secrets.
-6. Evidence-version dependency graph and automatic invalidation.
-7. Signed Redress Receipts using a workspace verification key.
+1. Provision the hosted service, managed PostgreSQL, object storage, KMS, and identity provider.
+2. Run at least one live GPT-5.6 image extraction and semantic grading flow.
+3. Complete a clean-clone and deployed-browser acceptance test.
+4. Record the narrated demonstration and submit it with the hosted URL.
+5. Recruit real design partners and stewards; measure the roadmap success gates with real cases rather than synthetic counters.

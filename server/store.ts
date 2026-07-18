@@ -1,9 +1,20 @@
 import { randomUUID } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import path from "node:path";
 import type { RedressCase } from "../src/types.js";
 import { runEvaluation } from "./evaluation.js";
 import { createDemoCase } from "./fixtures.js";
 
 const cases = new Map<string, RedressCase>();
+const persistenceFile = process.env.REDRESSCI_PERSIST ? path.resolve("data", "state", "cases.json") : undefined;
+
+function persistCases() {
+  if (!persistenceFile) return;
+  mkdirSync(path.dirname(persistenceFile), { recursive: true });
+  const temporary = `${persistenceFile}.tmp`;
+  writeFileSync(temporary, JSON.stringify([...cases.values()], null, 2), { mode: 0o600 });
+  renameSync(temporary, persistenceFile);
+}
 
 export function resetStore() {
   cases.clear();
@@ -15,10 +26,14 @@ export function resetStore() {
     demo.runs = [fixed, broken];
   }
   cases.set(demo.id, demo);
+  persistCases();
   return demo;
 }
 
-resetStore();
+if (persistenceFile && existsSync(persistenceFile)) {
+  const saved = JSON.parse(readFileSync(persistenceFile, "utf8")) as RedressCase[];
+  for (const item of saved) cases.set(item.id, item);
+} else resetStore();
 
 export function listCases() {
   return [...cases.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
@@ -31,6 +46,7 @@ export function getCase(id: string) {
 export function saveCase(item: RedressCase) {
   item.updatedAt = new Date().toISOString();
   cases.set(item.id, item);
+  persistCases();
   return item;
 }
 
@@ -41,6 +57,7 @@ export function createCase(input: Partial<RedressCase>) {
   const assistantMatch = transcript.match(/(?:^|\n)\s*(?:ai|assistant|bot|agent)\s*:\s*([^\n]+(?:\n(?!\s*\w+\s*:)[^\n]+)*)/i);
   const item: RedressCase = {
     id: `RC-${Math.floor(1000 + Math.random() * 9000)}`,
+    reporterId: input.reporterId,
     title: input.title || "New AI failure report",
     description: input.description || "",
     product: input.product || "Unspecified AI system",

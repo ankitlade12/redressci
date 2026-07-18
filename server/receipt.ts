@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { RedressCase } from "../src/types.js";
+import { signPlatformDocument } from "./platform.js";
 
 export function createRedressReceipt(item: RedressCase) {
   if (!item.evaluation || item.evaluation.status !== "verified") throw new Error("A receipt requires a verified evaluation.");
@@ -9,9 +10,9 @@ export function createRedressReceipt(item: RedressCase) {
   const evaluationHash = createHash("sha256").update(JSON.stringify(item.evaluation)).digest("hex");
   const proofHash = createHash("sha256").update(`${evaluationHash}:${broken.id}:${fixed.id}`).digest("hex");
 
-  return {
+  return signPlatformDocument({
     type: "redressci-remediation-receipt",
-    version: 1,
+    version: 2,
     caseId: item.id,
     title: item.title,
     statement: "The reported behavior was reproduced in the known-broken version and was not present in the corrected version under this evaluation.",
@@ -25,5 +26,5 @@ export function createRedressReceipt(item: RedressCase) {
     },
     issuedAt: new Date().toISOString(),
     proofSha256: proofHash,
-  };
+  });
 }

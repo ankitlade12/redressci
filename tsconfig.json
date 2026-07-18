@@ -16,5 +16,5 @@
     "noEmit": true,
     "jsx": "react-jsx"
   },
-  "include": ["src", "server", "runner", "vite.config.ts"]
+  "include": ["src", "server", "runner", "sdk", "scripts", "vite.config.ts"]
 }
