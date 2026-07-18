@@ -1,0 +1,39 @@
+{
+  "name": "redressci",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Turn real AI failures into tests that stay fixed.",
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c cyan,green \"node --watch --import tsx server/index.ts\" \"vite\"",
+    "build": "tsc --noEmit && vite build",
+    "start": "node --import tsx server/index.ts --production",
+    "test": "node --import tsx --test server/api.test.ts server/compiler.test.ts server/privacy.test.ts server/workflow.test.ts runner/evaluation.test.ts",
+    "test:ci": "node --import tsx runner/cli.ts evals/cooling-center-accessibility-001.json --target fixed",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "latest",
+    "concurrently": "latest",
+    "dotenv": "^17.4.2",
+    "express": "latest",
+    "multer": "latest",
+    "openai": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "vite": "latest",
+    "zod": "latest"
+  },
+  "devDependencies": {
+    "@types/express": "latest",
+    "@types/multer": "latest",
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "tsx": "latest",
+    "typescript": "latest"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

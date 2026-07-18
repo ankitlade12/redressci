@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760" role="img" aria-labelledby="title desc">
+  <title id="title">Synthetic CivicAid conversation</title>
+  <desc id="desc">A fictional chat where Maya asks for a wheelchair-accessible cooling center and the assistant incorrectly recommends Central Hall.</desc>
+  <rect width="1200" height="760" rx="28" fill="#f5f3ed"/>
+  <rect x="34" y="34" width="1132" height="692" rx="22" fill="#fffefa" stroke="#dcded7" stroke-width="2"/>
+  <rect x="34" y="34" width="1132" height="82" rx="22" fill="#146b48"/>
+  <rect x="34" y="92" width="1132" height="24" fill="#146b48"/>
+  <circle cx="84" cy="75" r="19" fill="#d8f071"/>
+  <text x="119" y="84" font-family="Arial, sans-serif" font-size="28" font-weight="700" fill="white">CivicAid</text>
+  <text x="1004" y="82" font-family="Arial, sans-serif" font-size="17" fill="#d9eee3">Synthetic demo</text>
+  <rect x="345" y="172" width="755" height="138" rx="24" fill="#e4f0e8"/>
+  <text x="382" y="218" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#146b48">Maya Chen</text>
+  <text x="382" y="258" font-family="Arial, sans-serif" font-size="24" fill="#17231d">Which nearby cooling center can I enter</text>
+  <text x="382" y="290" font-family="Arial, sans-serif" font-size="24" fill="#17231d">using a wheelchair?</text>
+  <rect x="100" y="360" width="790" height="190" rx="24" fill="#f0efe9"/>
+  <text x="138" y="407" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#146b48">CivicAid</text>
+  <text x="138" y="450" font-family="Arial, sans-serif" font-size="24" fill="#17231d">Hi Maya — Central Hall is the closest cooling center.</text>
+  <text x="138" y="486" font-family="Arial, sans-serif" font-size="24" fill="#17231d">It is at 100 Civic Plaza and open until 8 PM.</text>
+  <rect x="100" y="607" width="1000" height="64" rx="12" fill="#f7e9e5" stroke="#e5c5bd"/>
+  <text x="134" y="646" font-family="Arial, sans-serif" font-size="18" fill="#a94336">Synthetic artifact — Central Hall is stairs-only in the supplied facility record.</text>
+</svg>

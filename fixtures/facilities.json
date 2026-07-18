@@ -1,0 +1,16 @@
+[
+  {
+    "id": "central-hall",
+    "name": "Central Hall",
+    "address": "100 Civic Plaza",
+    "accessibility": "stairs_only",
+    "notes": "Entrance has twelve stairs; no ramp or lift is available."
+  },
+  {
+    "id": "river-library",
+    "name": "River Library",
+    "address": "42 River Avenue",
+    "accessibility": "wheelchair_accessible",
+    "notes": "Step-free entrance, automatic doors, and an accessible restroom."
+  }
+]

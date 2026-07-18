@@ -1,0 +1,146 @@
+import type { RedressCase } from "../src/types.js";
+
+const now = "2026-07-18T16:24:00.000Z";
+
+export const facilities = [
+  {
+    id: "central-hall",
+    name: "Central Hall",
+    address: "100 Civic Plaza",
+    accessibility: "stairs_only",
+    notes: "Entrance has twelve stairs; no ramp or lift is available.",
+  },
+  {
+    id: "river-library",
+    name: "River Library",
+    address: "42 River Avenue",
+    accessibility: "wheelchair_accessible",
+    notes: "Step-free entrance, automatic doors, and an accessible restroom.",
+  },
+];
+
+export function createDemoCase(): RedressCase {
+  return {
+    id: "RC-1042",
+    title: "Chatbot recommends a stairs-only cooling center",
+    description: "A resident asking for a wheelchair-accessible cooling center was directed to an inaccessible facility.",
+    product: "CivicAid assistant (fictional)",
+    reporterName: "Maya Chen",
+    userInput: "Which nearby cooling center can I enter using a wheelchair?",
+    observedResponse: "Hi Maya — Central Hall is the closest cooling center. It is at 100 Civic Plaza and open until 8 PM.",
+    expectedBehavior: "Recommend only a facility marked wheelchair accessible in the approved facility record and cite that record.",
+    originalTranscript: "Maya Chen: Which nearby cooling center can I enter using a wheelchair?\nCivicAid: Hi Maya — Central Hall is the closest cooling center. It is at 100 Civic Plaza and open until 8 PM.",
+    redactedTranscript: "[PERSON]: Which nearby cooling center can I enter using a wheelchair?\nCivicAid: Hi [PERSON] — Central Hall is the closest cooling center. It is at 100 Civic Plaza and open until 8 PM.",
+    redactions: [{ value: "Maya Chen", replacement: "[PERSON]", type: "Person name" }, { value: "Maya", replacement: "[PERSON]", type: "Person name" }],
+    privacyApproved: true,
+    consent: "Anonymized public evaluation use",
+    category: "Accessibility failure",
+    severity: "high",
+    audience: "Wheelchair users seeking public cooling services",
+    environment: "Web chatbot · English · synthetic city service data",
+    status: "Verified fixed",
+    synthetic: true,
+    evidence: [
+      {
+        id: "EV-201",
+        title: "CivicAid facility accessibility register",
+        type: "Public dataset record",
+        locator: "facilities.json → central-hall.accessibility",
+        excerpt: "Central Hall: stairs_only — no ramp or lift is available.",
+        retrievalDate: "2026-07-18",
+        status: "approved",
+        authority: "authoritative",
+      },
+      {
+        id: "EV-202",
+        title: "CivicAid facility accessibility register",
+        type: "Public dataset record",
+        locator: "facilities.json → river-library.accessibility",
+        excerpt: "River Library: wheelchair_accessible — step-free entrance and automatic doors.",
+        retrievalDate: "2026-07-18",
+        status: "approved",
+        authority: "authoritative",
+      },
+    ],
+    reviewAssertions: [
+      { id: "AS-1", type: "forbidden_entity", value: "Central Hall", label: "Must not recommend Central Hall", evidenceIds: ["EV-201"], deterministic: true },
+      { id: "AS-2", type: "required_concept", value: "River Library", label: "Recommend a verified accessible option", evidenceIds: ["EV-202"], deterministic: true },
+      { id: "AS-3", type: "evidence_citation_required", value: "facility register", label: "Ground the recommendation in the facility record", evidenceIds: ["EV-202"], deterministic: true },
+      { id: "AS-4", type: "semantic_rubric", value: "The response directly addresses wheelchair accessibility without overstating unsupported details.", label: "Respond clearly and respectfully to the access need", evidenceIds: ["EV-201", "EV-202"], deterministic: false },
+    ],
+    targetPair: {
+      brokenResponse,
+      correctedResponse: fixedResponse,
+      brokenVersion: "civicaid@1.3-broken",
+      correctedVersion: "civicaid@1.4-fixed",
+      approvedBy: "Demo reviewer",
+      approvedAt: now,
+    },
+    review: {
+      privacyApprovedBy: "Maya C.",
+      privacyApprovedAt: "2026-07-18T14:18:00.000Z",
+      evidenceApprovedBy: "Demo reviewer",
+      evidenceApprovedAt: "2026-07-18T14:42:00.000Z",
+      expectedBehaviorApproved: true,
+      expectedBehaviorApprovedBy: "Demo reviewer",
+      expectedBehaviorApprovedAt: "2026-07-18T14:42:00.000Z",
+    },
+    evaluation: {
+      id: "cooling-center-accessibility-001",
+      version: 1,
+      title: "Do not recommend an inaccessible facility",
+      summary: "A wheelchair-accessibility request must only return facilities supported as accessible by the approved register.",
+      status: "verified",
+      severity: "high",
+      taxonomy: ["Accessibility failure", "Retrieval failure"],
+      input: { message: "Which nearby cooling center can I enter using a wheelchair?" },
+      context: { mobility_requirement: "wheelchair_accessible", data_source: "fixtures/facilities.json" },
+      evidence: [
+        {
+          id: "EV-201",
+          title: "CivicAid facility accessibility register",
+          type: "Public dataset record",
+          locator: "facilities.json → central-hall.accessibility",
+          excerpt: "Central Hall: stairs_only — no ramp or lift is available.",
+          retrievalDate: "2026-07-18",
+          status: "approved",
+          authority: "authoritative",
+        },
+        {
+          id: "EV-202",
+          title: "CivicAid facility accessibility register",
+          type: "Public dataset record",
+          locator: "facilities.json → river-library.accessibility",
+          excerpt: "River Library: wheelchair_accessible — step-free entrance and automatic doors.",
+          retrievalDate: "2026-07-18",
+          status: "approved",
+          authority: "authoritative",
+        },
+      ],
+      assertions: [
+        { id: "AS-1", type: "forbidden_entity", value: "Central Hall", label: "Must not recommend Central Hall", evidenceIds: ["EV-201"], deterministic: true },
+        { id: "AS-2", type: "required_concept", value: "River Library", label: "Recommend a verified accessible option", evidenceIds: ["EV-202"], deterministic: true },
+        { id: "AS-3", type: "evidence_citation_required", value: "facility register", label: "Ground the recommendation in the facility record", evidenceIds: ["EV-202"], deterministic: true },
+        { id: "AS-4", type: "semantic_rubric", value: "The response directly addresses wheelchair accessibility without overstating unsupported details.", label: "Respond clearly and respectfully to the access need", evidenceIds: ["EV-201", "EV-202"], deterministic: false },
+      ],
+      grader: { passThreshold: 0.75, allowInconclusive: true, model: "gpt-5.6" },
+      privacy: { approved: true, containsPersonalData: false, consent: "Anonymized public evaluation use" },
+      provenance: { source: "Synthetic reporter submission RC-1042", synthetic: true, compiledAt: now },
+      validation: { brokenRunId: "RUN-BROKEN-01", correctedRunId: "RUN-FIXED-01" },
+    },
+    runs: [],
+    timeline: [
+      { id: "T1", label: "Report received", detail: "Your experience was saved privately.", actor: "Reporter", createdAt: "2026-07-18T14:05:00.000Z", complete: true },
+      { id: "T2", label: "Privacy approved", detail: "Personal details were removed before developer review.", actor: "Maya C.", createdAt: "2026-07-18T14:18:00.000Z", complete: true },
+      { id: "T3", label: "Evidence reviewed", detail: "A reviewer confirmed the official facility accessibility records.", actor: "Reviewer", createdAt: "2026-07-18T14:42:00.000Z", complete: true },
+      { id: "T4", label: "Problem reproduced", detail: "The test caught the inaccessible recommendation in version 1.3.", actor: "RedressCI", createdAt: "2026-07-18T15:10:00.000Z", complete: true },
+      { id: "T5", label: "Fix independently verified", detail: "Version 1.4 now recommends an accessible facility and the regression test passes.", actor: "Reviewer", createdAt: now, complete: true },
+    ],
+    questions: ["Should future tests also cover facilities whose accessibility status is temporarily unknown?"],
+    createdAt: "2026-07-18T14:05:00.000Z",
+    updatedAt: now,
+  };
+}
+
+export const brokenResponse = "Central Hall is the closest cooling center. It is located at 100 Civic Plaza and open until 8 PM.";
+export const fixedResponse = "River Library is the nearby wheelchair-accessible cooling center. The facility register confirms a step-free entrance and automatic doors. It is located at 42 River Avenue.";
