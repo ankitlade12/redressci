@@ -25,6 +25,15 @@ test("validation gate only passes for a broken failure and corrected pass", () =
   assert.equal(passesValidationGate(fixed, broken), false);
 });
 
+test("comparative runs use the same immutable grader prompt provenance", () => {
+  const evaluation = createDemoCase().evaluation!;
+  const broken = runEvaluation(evaluation, "broken");
+  const fixed = runEvaluation(evaluation, "fixed");
+
+  assert.equal(broken.promptVersion, fixed.promptVersion);
+  assert.match(broken.promptVersion, /^semantic-grade@[a-f0-9]{12}$/);
+});
+
 test("insufficient semantic evidence remains inconclusive", () => {
   const evaluation = createDemoCase().evaluation!;
   const results = deterministicGrade(evaluation, "I cannot answer that question.");

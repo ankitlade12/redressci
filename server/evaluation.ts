@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { AssertionResult, EvaluationCase, EvaluationRun, ResultState } from "../src/types.js";
 import { brokenResponse, fixedResponse } from "./fixtures.js";
-import { aiStatus, semanticGrade } from "./ai.js";
+import { aiStatus, semanticGrade, semanticGraderPromptVersion } from "./ai.js";
 
 function summarizeResults(evaluation: EvaluationCase, assertionResults: AssertionResult[]) {
   const conclusive = assertionResults.filter((result) => result.state !== "inconclusive");
@@ -84,7 +84,7 @@ export function runEvaluation(evaluation: EvaluationCase, target: "broken" | "fi
     target,
     targetVersion: target === "broken" ? "civicaid@1.3-broken" : "civicaid@1.4-fixed",
     model: "demo-rule-target",
-    promptVersion: target === "broken" ? "system-prompt@7" : "system-prompt@8",
+    promptVersion: semanticGraderPromptVersion,
     response,
     state,
     score,

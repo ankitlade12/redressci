@@ -80,7 +80,7 @@
 
 ## Automated verification
 
-The suite currently covers 23 checks, including:
+The suite currently covers 30 checks, including:
 
 - broken-target failure and corrected-target success;
 - validation-gate ordering;
@@ -90,7 +90,8 @@ The suite currently covers 23 checks, including:
 - personal-data leak blocking;
 - expected-behavior approval;
 - privacy detection and manual reintroduction detection; and
-- a complete fresh-report lifecycle through evaluation-verified status, including rejection of unsupported deployed-fix claims.
+- a complete fresh-report lifecycle through evaluation-verified status, including rejection of unsupported deployed-fix claims;
+- shared hash-derived grader-policy provenance across comparative targets;
 - signed-role token tamper resistance;
 - evidence dependency invalidation and review queueing;
 - mutation, stability, calibration, and scope assurance;
