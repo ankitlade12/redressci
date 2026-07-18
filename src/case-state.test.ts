@@ -87,7 +87,8 @@ test("private recorded-response validation never claims publication or a deploye
   assert.match(html, /remains private under its current consent scope/i);
   assert.match(html, /Evaluation verified/);
   assert.match(html, /Assertions passed/);
-  assert.match(html, /Grader prompt/);
+  assert.match(html, /Grader policy/);
+  assert.match(html, /Re-run validation/);
   assert.doesNotMatch(html, /Publication is allowed/i);
   assert.doesNotMatch(html, /independently verified/i);
 });
