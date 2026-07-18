@@ -1,10 +1,24 @@
 import type { Assertion, Evidence, RedressCase, TargetPair } from "./types";
-import type { PlatformDashboard } from "./platform-types";
+import type { PlatformDashboard, WorkspaceMember, WorkspaceRole } from "./platform-types";
+
+let authToken = "";
+
+export function setApiToken(token: string) {
+  authToken = token;
+}
+
+function apiHeaders(headers?: HeadersInit) {
+  return {
+    "Content-Type": "application/json",
+    ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+    ...headers,
+  };
+}
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(path, {
-    headers: { "Content-Type": "application/json", ...options?.headers },
     ...options,
+    headers: apiHeaders(options?.headers),
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload.error || "Something went wrong");
@@ -13,6 +27,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   health: () => request<{ ok: boolean; ai: { configured: boolean; model: string }; demoMode: boolean }>("/api/health"),
+  demoAuth: (role: WorkspaceRole) => request<{ token: string; member: WorkspaceMember }>(`/api/auth/demo/${role}`, { method: "POST", body: "{}" }),
   cases: () => request<{ cases: RedressCase[] }>("/api/cases"),
   case: (id: string) => request<{ case: RedressCase }>(`/api/cases/${id}`),
   reset: () => request<{ case: RedressCase }>("/api/reset", { method: "POST" }),
@@ -20,7 +35,7 @@ export const api = {
   uploadArtifact: async (id: string, file: File) => {
     const form = new FormData();
     form.append("artifact", file);
-    const response = await fetch(`/api/cases/${id}/artifacts`, { method: "POST", body: form });
+    const response = await fetch(`/api/cases/${id}/artifacts`, { method: "POST", headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined, body: form });
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.error || "Upload failed");
     return payload;

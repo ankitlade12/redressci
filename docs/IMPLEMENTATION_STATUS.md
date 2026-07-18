@@ -75,7 +75,7 @@
 
 ## Automated verification
 
-The suite currently covers 21 checks, including:
+The suite currently covers 23 checks, including:
 
 - broken-target failure and corrected-target success;
 - validation-gate ordering;
@@ -92,6 +92,7 @@ The suite currently covers 21 checks, including:
 - signed proof verification and tamper detection;
 - counterfactual review, sealed escrow, interoperability exports, and privacy thresholding; and
 - all-phase API surfaces and role denial.
+- canonical product URLs and safe route fallback behavior.
 
 Run:
 
@@ -103,6 +104,7 @@ npm run build
 
 ## Runtime modes and remaining external milestones
 
+- The hosted judge demo is live at <https://redressci.onrender.com>; browser history, direct routes, role-boundary previews, search/filter controls, truthful metrics, and stricter reporter consent are implemented.
 - Default judge mode is resettable and credential-free. `REDRESSCI_PERSIST=1` enables atomic durable snapshots.
 - The PostgreSQL schema is production-ready, but a managed database must be provisioned before replacing the local adapter in a hosted environment.
 - Artifacts are encrypted locally; a production deployment should connect the same metadata boundary to a managed regional object store and KMS.
@@ -114,8 +116,10 @@ npm run build
 
 ## Next operational milestone
 
-1. Provision the hosted service, managed PostgreSQL, object storage, KMS, and identity provider.
-2. Run at least one live GPT-5.6 image extraction and semantic grading flow.
-3. Complete a clean-clone and deployed-browser acceptance test.
+1. Provision managed PostgreSQL, object storage, KMS, and an identity provider before accepting sensitive pilot reports.
+2. Enable the hosted GPT-5.6 secret only with an explicit deployment-secret decision; the public judge path remains deterministic without it.
+3. Complete role-by-role deployed-browser and accessibility acceptance tests.
 4. Record the narrated demonstration and submit it with the hosted URL.
 5. Recruit real design partners and stewards; measure the roadmap success gates with real cases rather than synthetic counters.
+
+See [PRODUCT_READINESS_AUDIT.md](./PRODUCT_READINESS_AUDIT.md) for the adoption, trust, and production-gap assessment.

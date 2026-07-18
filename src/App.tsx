@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { api } from "./api";
+import { api, setApiToken } from "./api";
 import { Icon } from "./icons";
 import { parseRoute, routePath, type AppRoute, type Page } from "./routing";
 import type { AssertionResult, EvaluationRun, RedressCase, ResultState } from "./types";
-import type { PlatformDashboard } from "./platform-types";
+import type { PlatformDashboard, WorkspaceRole } from "./platform-types";
 
 type CaseTab = "overview" | "evidence" | "evaluation" | "validation" | "timeline" | "ci";
 
@@ -18,19 +18,22 @@ function Logo({ onDashboard }: { onDashboard?: () => void }) {
   return <button className="logo" onClick={onDashboard || (() => location.assign("/"))} aria-label="Go to dashboard"><span className="logo-mark"><Icon name="mark" size={21} /></span><span>Redress<span>CI</span></span></button>;
 }
 
-function Shell({ children, page, onNavigate, onReport, ai }: { children: React.ReactNode; page: Page; onNavigate: (page: Page) => void; onReport: () => void; ai: boolean }) {
+const roleLabels: Record<WorkspaceRole, string> = { reporter: "Reporter", reviewer: "Reviewer", developer: "Developer", admin: "Administrator", partner: "Verifier" };
+
+function Shell({ children, page, onNavigate, onReport, ai, role, roleBusy, onRoleChange }: { children: React.ReactNode; page: Page; onNavigate: (page: Page) => void; onReport: () => void; ai: boolean; role: WorkspaceRole; roleBusy: boolean; onRoleChange: (role: WorkspaceRole) => void }) {
+  const canReport = role === "reporter" || role === "admin";
   return <div className="app-shell">
     <aside className="sidebar">
       <Logo onDashboard={() => onNavigate("dashboard")} />
       <nav aria-label="Main navigation">
         <button className={page === "dashboard" ? "active" : ""} onClick={() => onNavigate("dashboard")}><Icon name="grid" />Cases</button>
-        <button className={page === "assurance" ? "active" : ""} onClick={() => onNavigate("assurance")}><Icon name="shield" />Assurance network</button>
-        <button onClick={onReport}><Icon name="plus" />Report a failure</button>
+        {role !== "reporter" && <button className={page === "assurance" ? "active" : ""} onClick={() => onNavigate("assurance")}><Icon name="shield" />Assurance network</button>}
+        <button onClick={onReport} disabled={!canReport} title={canReport ? "Create a private report" : "Switch to Reporter to submit a report"}><Icon name="plus" />Report a failure</button>
       </nav>
       <div className="sidebar-spacer" />
-      <div className="workspace-card">
-        <span className="avatar">OP</span>
-        <div><strong>Open Public Lab</strong><small>Demo workspace</small></div>
+      <div className="workspace-card role-card">
+        <span className="avatar">{role.slice(0, 2).toUpperCase()}</span>
+        <label><small>VIEW PRIVACY BOUNDARY AS</small><select value={role} disabled={roleBusy} onChange={(event) => onRoleChange(event.target.value as WorkspaceRole)} aria-label="View demo as role">{Object.entries(roleLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
       </div>
       <div className={`ai-status ${ai ? "online" : ""}`}><span />{ai ? "GPT-5.6 connected" : "Synthetic demo mode"}</div>
     </aside>
@@ -38,27 +41,43 @@ function Shell({ children, page, onNavigate, onReport, ai }: { children: React.R
   </div>;
 }
 
-function Dashboard({ cases, onOpen, onReport, onReset }: { cases: RedressCase[]; onOpen: (id: string) => void; onReport: () => void; onReset: () => void }) {
+function Dashboard({ cases, onOpen, onReport, onReset, canReport, canReset }: { cases: RedressCase[]; onOpen: (id: string) => void; onReport: () => void; onReset: () => void; canReport: boolean; canReset: boolean }) {
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<"all" | "review" | "verified">("all");
   const verified = cases.filter((item) => item.status === "Verified fixed").length;
+  const needsReview = cases.length - verified;
+  const matchingCases = cases.filter((item) => {
+    const matchesFilter = filter === "all" || (filter === "verified" ? item.status === "Verified fixed" : item.status !== "Verified fixed");
+    const haystack = `${item.id} ${item.title} ${item.product} ${item.category}`.toLowerCase();
+    return matchesFilter && haystack.includes(query.trim().toLowerCase());
+  });
+  const reproduceMinutes = cases.flatMap((item) => {
+    const reported = item.timeline.find((event) => event.label === "Report received");
+    const reproduced = item.timeline.find((event) => event.label === "Problem reproduced");
+    return reported && reproduced ? [Math.max(0, Math.round((new Date(reproduced.createdAt).getTime() - new Date(reported.createdAt).getTime()) / 60_000))] : [];
+  }).sort((a, b) => a - b);
+  const medianMinutes = reproduceMinutes.length ? reproduceMinutes[Math.floor(reproduceMinutes.length / 2)] : null;
+  const protectedChecks = cases.reduce((total, item) => total + (item.runs.find((run) => run.target === "fixed")?.assertionResults.filter((result) => result.state === "pass").length || 0), 0);
   return <div className="page dashboard-page">
-    <header className="topbar"><div /><div className="top-actions"><button className="icon-button" aria-label="Search"><Icon name="search" /></button><button className="button primary" onClick={onReport}><Icon name="plus" size={17} />Report a failure</button></div></header>
+    <header className="topbar"><div /><div className="top-actions"><label className="case-search"><Icon name="search" size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search cases" aria-label="Search cases" /></label><button className="button primary" onClick={onReport} disabled={!canReport} title={canReport ? "Create a private report" : "Switch to Reporter to submit a report"}><Icon name="plus" size={17} />Report a failure</button></div></header>
     <section className="hero">
       <div className="eyebrow"><span /> FROM EXPERIENCE TO PROTECTION</div>
       <h1>Turn AI failures into<br /><em>tests that stay fixed.</em></h1>
       <p>RedressCI gives every reported failure a path to evidence, verification, and permanent regression protection.</p>
-      <div className="hero-actions"><button className="button dark" onClick={() => cases[0] && onOpen(cases[0].id)}>Explore the verified demo <Icon name="arrow" size={17} /></button><button className="button quiet" onClick={onReset}><Icon name="refresh" size={17} />Reset demo</button></div>
+      <div className="hero-actions"><button className="button dark" onClick={() => cases.find((item) => item.status === "Verified fixed") && onOpen(cases.find((item) => item.status === "Verified fixed")!.id)}>Explore the verified demo <Icon name="arrow" size={17} /></button>{canReset && <button className="button quiet" onClick={onReset}><Icon name="refresh" size={17} />Reset demo</button>}</div>
     </section>
+    <section className="lifecycle-strip" aria-label="RedressCI workflow">{[["01", "Report", "Capture the affected person’s experience"], ["02", "Review", "Approve privacy, evidence, and expectations"], ["03", "Prove", "Require broken-fails and fixed-passes"], ["04", "Protect", "Export the case into release CI"]].map(([number, label, copy]) => <div key={number}><span>{number}</span><strong>{label}</strong><small>{copy}</small></div>)}</section>
     <section className="metrics" aria-label="Case metrics">
-      <div><small>OPEN CASES</small><strong>{String(Math.max(cases.length - verified, 0)).padStart(2, "0")}</strong><span>Awaiting action</span></div>
+      <div><small>OPEN CASES</small><strong>{String(needsReview).padStart(2, "0")}</strong><span>Awaiting action</span></div>
       <div><small>VERIFIED FIXED</small><strong>{String(verified).padStart(2, "0")}</strong><span className="positive">↑ Permanent protection</span></div>
-      <div><small>MEDIAN TO REPRODUCE</small><strong>38<sup>m</sup></strong><span>Synthetic workspace</span></div>
-      <div className="metric-accent"><small>REGRESSIONS BLOCKED</small><strong>12</strong><span>This evaluation pack</span></div>
+      <div><small>MEDIAN TO REPRODUCE</small><strong>{medianMinutes ?? "—"}{medianMinutes !== null && <sup>m</sup>}</strong><span>From recorded timelines</span></div>
+      <div className="metric-accent"><small>PROTECTED CHECKS</small><strong>{String(protectedChecks).padStart(2, "0")}</strong><span>Passing on corrected targets</span></div>
     </section>
     <section className="cases-section">
-      <div className="section-heading"><div><h2>Cases</h2><p>Every report has a visible path to closure.</p></div><div className="filter-row"><button className="filter active">All <b>{cases.length}</b></button><button className="filter">Needs review</button><button className="filter">Verified</button></div></div>
+      <div className="section-heading"><div><h2>Cases</h2><p>Every report has a visible path to closure.</p></div><div className="filter-row"><button className={`filter ${filter === "all" ? "active" : ""}`} onClick={() => setFilter("all")}>All <b>{cases.length}</b></button><button className={`filter ${filter === "review" ? "active" : ""}`} onClick={() => setFilter("review")}>Needs review <b>{needsReview}</b></button><button className={`filter ${filter === "verified" ? "active" : ""}`} onClick={() => setFilter("verified")}>Verified <b>{verified}</b></button></div></div>
       <div className="case-table">
         <div className="table-head"><span>CASE</span><span>STATUS</span><span>SEVERITY</span><span>LATEST RUN</span><span>UPDATED</span><span /></div>
-        {cases.map((item) => <button className="case-row" onClick={() => onOpen(item.id)} key={item.id}>
+        {matchingCases.map((item) => <button className="case-row" onClick={() => onOpen(item.id)} key={item.id}>
           <span className="case-title"><i className="category-icon"><Icon name="shield" size={18} /></i><span><strong>{item.title}</strong><small>{item.id} · {item.product}</small></span></span>
           <span><StatusPill state={item.status === "Verified fixed" ? "verified" : "private"}>{item.status}</StatusPill></span>
           <span><StatusPill state={item.severity}>{item.severity}</StatusPill></span>
@@ -66,6 +85,7 @@ function Dashboard({ cases, onOpen, onReport, onReset }: { cases: RedressCase[];
           <span className="date-cell">{formatDate(item.updatedAt)}</span>
           <span><Icon name="chevron" size={18} /></span>
         </button>)}
+        {!matchingCases.length && <div className="case-empty"><Icon name="search" /><strong>No matching cases</strong><span>Try another search or filter.</span></div>}
       </div>
     </section>
     <footer className="trust-note"><Icon name="shield" size={18} /><span><strong>Privacy by default.</strong> Original reports remain separate from anonymized evaluations.</span></footer>
@@ -287,23 +307,29 @@ function TimelineView({ item }: { item: RedressCase }) {
 }
 
 function CIView({ item }: { item: RedressCase }) {
+  const [copied, setCopied] = useState(false);
   const workflow = `name: RedressCI regression pack\n\non:\n  pull_request:\n  push:\n    branches: [main]\n\njobs:\n  evaluate:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-node@v4\n        with:\n          node-version: 22\n      - run: npm ci\n      - run: npm run test:ci\n      - uses: actions/upload-artifact@v4\n        if: always()\n        with:\n          name: redressci-results\n          path: results/*.json`;
-  const copy = () => navigator.clipboard.writeText(workflow);
-  return <div className="two-column ci-layout"><div className="content-stack"><div className="view-title compact"><div><span className="eyebrow"><span /> PERMANENT PROTECTION</span><h2>Ship the test with the fix.</h2><p>The portable runner returns a non-zero exit code when this failure returns.</p></div></div><section className="card install-steps"><h3>Run anywhere Node.js runs</h3><ol><li><span>1</span><div><strong>Download the evaluation</strong><p>No original artifacts, names, or secrets are included.</p></div></li><li><span>2</span><div><strong>Add the workflow</strong><p>Commit the generated GitHub Actions file.</p></div></li><li><span>3</span><div><strong>Protect your release</strong><p>A failed assertion blocks CI and writes a JSON result.</p></div></li></ol><a className="button dark wide" href={`/api/cases/${item.id}/export`} download><Icon name="download" size={17} />Download evaluation JSON</a><a className="button receipt-button wide" href={`/api/cases/${item.id}/receipt`} download><Icon name="shield" size={17} />Download Redress Receipt</a></section><div className="principle"><Icon name="shield" /><p><strong>Vendor-neutral by design.</strong><br />The case format can target an HTTP endpoint, recorded response, or local adapter.</p></div></div><section className="card code-panel workflow"><div className="code-head"><strong>.github/workflows/redressci.yml</strong><button onClick={copy}>Copy</button></div><pre>{workflow}</pre></section></div>;
+  const copy = async () => { await navigator.clipboard.writeText(workflow); setCopied(true); window.setTimeout(() => setCopied(false), 1800); };
+  return <div className="two-column ci-layout"><div className="content-stack"><div className="view-title compact"><div><span className="eyebrow"><span /> PERMANENT PROTECTION</span><h2>Ship the test with the fix.</h2><p>The portable runner returns a non-zero exit code when this failure returns.</p></div></div><section className="card install-steps"><h3>Run anywhere Node.js runs</h3><ol><li><span>1</span><div><strong>Download the evaluation</strong><p>No original artifacts, names, or secrets are included.</p></div></li><li><span>2</span><div><strong>Add the workflow</strong><p>Commit the generated GitHub Actions file.</p></div></li><li><span>3</span><div><strong>Protect your release</strong><p>A failed assertion blocks CI and writes a JSON result.</p></div></li></ol><a className="button dark wide" href={`/api/cases/${item.id}/export`} download><Icon name="download" size={17} />Download evaluation JSON</a><a className="button receipt-button wide" href={`/api/cases/${item.id}/receipt`} download><Icon name="shield" size={17} />Download Redress Receipt</a></section><div className="principle"><Icon name="shield" /><p><strong>Vendor-neutral by design.</strong><br />The case format can target an HTTP endpoint, recorded response, or local adapter.</p></div></div><section className="card code-panel workflow"><div className="code-head"><strong>.github/workflows/redressci.yml</strong><button onClick={copy}>{copied ? "Copied ✓" : "Copy"}</button></div><pre>{workflow}</pre></section></div>;
 }
 
 function ReportPage({ onCancel, onCreated }: { onCancel: () => void; onCreated: (item: RedressCase) => void }) {
   const [step, setStep] = useState(1);
   const [busy, setBusy] = useState(false);
   const [artifact, setArtifact] = useState<File | null>(null);
+  const [acknowledged, setAcknowledged] = useState(false);
+  const [error, setError] = useState("");
   const [form, setForm] = useState({ reporterName: "", product: "", originalTranscript: "", description: "", expectedBehavior: "", consent: "Private to reporter" });
   const set = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
-  const submit = async () => { setBusy(true); try { const { case: item } = await api.createCase({ ...form, title: form.description.slice(0, 70) || "Reported AI failure" }); if (artifact) { await api.uploadArtifact(item.id, artifact); if (artifact.type.startsWith("image/")) { const imageDataUrl = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = reject; reader.readAsDataURL(artifact); }); await api.extract(item.id, { transcript: form.originalTranscript, imageDataUrl }); } } await api.redact(item.id, form.originalTranscript, false); onCreated((await api.case(item.id)).case); } finally { setBusy(false); } };
+  const canContinue = step === 1 ? Boolean(form.product.trim() && (form.originalTranscript.trim() || artifact)) : step === 2 ? Boolean(form.description.trim()) : acknowledged;
+  const chooseArtifact = (file: File | null) => { setError(""); if (file && file.size > 8 * 1024 * 1024) { setArtifact(null); setError("The attachment is larger than 8 MB. Choose a smaller file."); return; } setArtifact(file); };
+  const submit = async () => { setBusy(true); setError(""); try { const { case: item } = await api.createCase({ ...form, title: form.description.slice(0, 70) || "Reported AI failure" }); if (artifact) { await api.uploadArtifact(item.id, artifact); if (artifact.type.startsWith("image/")) { const imageDataUrl = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = reject; reader.readAsDataURL(artifact); }); await api.extract(item.id, { transcript: form.originalTranscript, imageDataUrl }); } } await api.redact(item.id, form.originalTranscript, false); onCreated((await api.case(item.id)).case); } catch (reason) { setError(reason instanceof Error ? reason.message : "The report could not be submitted. Please try again."); } finally { setBusy(false); } };
   return <div className="report-page"><header><Logo /><button className="icon-button" onClick={onCancel} aria-label="Close"><Icon name="close" /></button></header><div className="report-shell"><aside><span className="eyebrow"><span /> REPORT AN AI FAILURE</span><h1>Your experience can protect the next person.</h1><p>You don’t need to know how software testing works. Tell us what happened; we’ll help structure it safely.</p><div className="steps">{["What happened", "Impact & expectation", "Privacy & consent"].map((label, index) => <div className={step >= index + 1 ? "active" : ""} key={label}><span>{step > index + 1 ? <Icon name="check" size={14} /> : index + 1}</span><strong>{label}</strong></div>)}</div><div className="privacy-promise"><Icon name="lock" /><p><strong>Private until you approve.</strong><br />Original evidence is separated from the anonymized case.</p></div></aside><section className="report-form card">
-    {step === 1 && <><span className="step-label">STEP 1 OF 3</span><h2>What happened?</h2><p>Paste the interaction exactly as you saw it. You can edit extracted text before it is used.</p><label>Your name or alias <small>Removed from shared tests</small><input value={form.reporterName} onChange={(e) => set("reporterName", e.target.value)} placeholder="e.g. Maya Chen" /></label><label>AI product or system<input value={form.product} onChange={(e) => set("product", e.target.value)} placeholder="e.g. City services chatbot" /></label><label>Conversation transcript<textarea rows={7} value={form.originalTranscript} onChange={(e) => set("originalTranscript", e.target.value)} placeholder={'You: What did you ask?\nAI: What did it answer?'} /></label><label className="upload-drop"><Icon name="upload" /><div><strong>{artifact ? artifact.name : "Or attach a screenshot"}</strong><small>{artifact ? `${Math.ceil(artifact.size / 1024)} KB · stored privately` : "PNG, JPG, WebP, PDF, or text · 8 MB max"}</small></div><span>{artifact ? "Replace" : "Choose file"}</span><input className="file-input" type="file" accept="image/png,image/jpeg,image/webp,application/pdf,text/plain" onChange={(event) => setArtifact(event.target.files?.[0] || null)} /></label></>}
+    {step === 1 && <><span className="step-label">STEP 1 OF 3</span><h2>What happened?</h2><p>Paste the interaction exactly as you saw it. You can edit extracted text before it is used.</p><label>Your name or alias <small>Optional · removed from shared tests</small><input value={form.reporterName} onChange={(e) => set("reporterName", e.target.value)} placeholder="e.g. Maya Chen" /></label><label>AI product or system <small>Required</small><input value={form.product} onChange={(e) => set("product", e.target.value)} placeholder="e.g. City services chatbot" required /></label><label>Conversation transcript <small>Required unless attaching evidence</small><textarea rows={7} value={form.originalTranscript} onChange={(e) => set("originalTranscript", e.target.value)} placeholder={'You: What did you ask?\nAI: What did it answer?'} /></label><label className="upload-drop"><Icon name="upload" /><div><strong>{artifact ? artifact.name : "Or attach a screenshot"}</strong><small>{artifact ? `${Math.ceil(artifact.size / 1024)} KB · stored privately` : "PNG, JPG, WebP, PDF, or text · 8 MB max"}</small></div><span>{artifact ? "Replace" : "Choose file"}</span><input className="file-input" type="file" accept="image/png,image/jpeg,image/webp,application/pdf,text/plain" onChange={(event) => chooseArtifact(event.target.files?.[0] || null)} /></label></>}
     {step === 2 && <><span className="step-label">STEP 2 OF 3</span><h2>Why did this response fail?</h2><p>Describe the effect in your own words. A reviewer will link any external claims to evidence.</p><label>What went wrong?<textarea rows={5} value={form.description} onChange={(e) => set("description", e.target.value)} placeholder="What was inaccurate, inaccessible, unsafe, or misleading?" /></label><label>What should have happened? <small>Optional</small><textarea rows={5} value={form.expectedBehavior} onChange={(e) => set("expectedBehavior", e.target.value)} placeholder="Describe the outcome you expected." /></label><div className="tip"><Icon name="sparkle" /><p>GPT-5.6 can propose a structured incident and surface unanswered questions, but a human reviewer approves the expected behavior.</p></div></>}
-    {step === 3 && <><span className="step-label">STEP 3 OF 3</span><h2>Choose how this can be shared.</h2><p>Your original submission always stays separate from the anonymized evaluation.</p><div className="consent-options">{["Private to reporter", "Shared with responsible organization", "Anonymized research use", "Anonymized public evaluation use"].map((option) => <label className={form.consent === option ? "selected" : ""} key={option}><input type="radio" name="consent" checked={form.consent === option} onChange={() => set("consent", option)} /><span><strong>{option}</strong><small>{option === "Private to reporter" ? "Only you and assigned reviewers can access it." : "Personal details are removed before sharing."}</small></span></label>)}</div><label className="approval-check"><input type="checkbox" defaultChecked /><span>I understand that I can withdraw this report before public publication.</span></label></>}
-    <footer><button className="button quiet" onClick={step === 1 ? onCancel : () => setStep(step - 1)}>{step === 1 ? "Cancel" : "Back"}</button><button className="button dark" disabled={busy || (step === 1 && !form.originalTranscript && !artifact)} onClick={step === 3 ? submit : () => setStep(step + 1)}>{busy ? "Creating private case…" : step === 3 ? "Submit report" : "Continue"}<Icon name="arrow" size={16} /></button></footer>
+    {step === 3 && <><span className="step-label">STEP 3 OF 3</span><h2>Choose how this can be shared.</h2><p>Your original submission always stays separate from the anonymized evaluation.</p><div className="consent-options">{["Private to reporter", "Shared with responsible organization", "Anonymized research use", "Anonymized public evaluation use"].map((option) => <label className={form.consent === option ? "selected" : ""} key={option}><input type="radio" name="consent" checked={form.consent === option} onChange={() => set("consent", option)} /><span><strong>{option}</strong><small>{option === "Private to reporter" ? "Only you and assigned reviewers can access it." : "Personal details are removed and a reviewer must approve sharing."}</small></span></label>)}</div><label className="approval-check"><input type="checkbox" checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)} /><span>I understand this report starts private and that I can withdraw consent before public publication.</span></label></>}
+    {error && <div className="form-error"><Icon name="alert" size={16} />{error}</div>}
+    <footer><button className="button quiet" onClick={step === 1 ? onCancel : () => { setError(""); setStep(step - 1); }}>{step === 1 ? "Cancel" : "Back"}</button><button className="button dark" disabled={busy || !canContinue} onClick={step === 3 ? submit : () => { setError(""); setStep(step + 1); }}>{busy ? "Creating private case…" : step === 3 ? "Submit private report" : "Continue"}<Icon name="arrow" size={16} /></button></footer>
   </section></div></div>;
 }
 
@@ -315,6 +341,8 @@ export default function App() {
   const [selected, setSelected] = useState<RedressCase | null>(null);
   const [ai, setAi] = useState(false);
   const [platform, setPlatform] = useState<PlatformDashboard | null>(null);
+  const [role, setRole] = useState<WorkspaceRole>("admin");
+  const [roleBusy, setRoleBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const page = route.page;
   const navigate = (next: AppRoute, replace = false) => {
@@ -324,12 +352,13 @@ export default function App() {
     window.scrollTo(0, 0);
   };
   const navigatePage = (nextPage: Page) => navigate({ page: nextPage });
-  const load = async () => {
-    const [{ cases: loadedCases }, health, { platform }] = await Promise.all([api.cases(), api.health(), api.platform()]);
-    setCases(loadedCases); setAi(health.ai.configured); setPlatform(platform);
-    if (route.page === "case" && route.caseId) {
-      const matchingCase = loadedCases.find((item) => item.id === route.caseId);
-      setSelected(matchingCase || (await api.case(route.caseId)).case);
+  const load = async (activeRole: WorkspaceRole = role, activeRoute: AppRoute = route) => {
+    const platformRequest = activeRole === "reporter" ? Promise.resolve(null) : api.platform().then((payload) => payload.platform);
+    const [{ cases: loadedCases }, health, activePlatform] = await Promise.all([api.cases(), api.health(), platformRequest]);
+    setCases(loadedCases); setAi(health.ai.configured); setPlatform(activePlatform);
+    if (activeRoute.page === "case" && activeRoute.caseId) {
+      const matchingCase = loadedCases.find((item) => item.id === activeRoute.caseId);
+      setSelected(matchingCase || (await api.case(activeRoute.caseId)).case);
     }
     setLoading(false);
   };
@@ -345,13 +374,22 @@ export default function App() {
     api.case(route.caseId).then(({ case: item }) => setSelected(item)).catch(() => navigate({ page: "dashboard" }, true));
   }, [loading, route.page, route.caseId, selected?.id]);
   const openCase = async (id: string) => { setSelected((await api.case(id)).case); navigate({ page: "case", caseId: id }); };
+  const switchRole = async (nextRole: WorkspaceRole) => {
+    setRoleBusy(true);
+    try {
+      const { token } = await api.demoAuth(nextRole);
+      setApiToken(token); setRole(nextRole); setSelected(null); setLoading(true);
+      navigate({ page: "dashboard" });
+      await load(nextRole, { page: "dashboard" });
+    } finally { setRoleBusy(false); }
+  };
   const refreshSelected = async () => { if (selected) { const fresh = (await api.case(selected.id)).case; setSelected(fresh); setCases((current) => current.map((item) => item.id === fresh.id ? fresh : item)); } };
   const refreshPlatform = async () => setPlatform((await api.platform()).platform);
   const reset = async () => { const { case: item } = await api.reset(); setCases([item]); setSelected(null); await refreshPlatform(); navigate({ page: "dashboard" }); };
   if (loading) return <div className="loading-screen"><Logo /><span /></div>;
   if (page === "report") return <ReportPage onCancel={() => navigate({ page: "dashboard" })} onCreated={(item) => { setCases((current) => [item, ...current]); setSelected(item); navigate({ page: "case", caseId: item.id }); }} />;
-  return <Shell page={page} onNavigate={navigatePage} onReport={() => navigate({ page: "report" })} ai={ai}>
-    {page === "dashboard" && <Dashboard cases={cases} onOpen={openCase} onReport={() => navigate({ page: "report" })} onReset={reset} />}
+  return <Shell page={page} onNavigate={navigatePage} onReport={() => navigate({ page: "report" })} ai={ai} role={role} roleBusy={roleBusy} onRoleChange={switchRole}>
+    {page === "dashboard" && <Dashboard cases={cases} onOpen={openCase} onReport={() => navigate({ page: "report" })} onReset={reset} canReport={role === "reporter" || role === "admin"} canReset={role === "admin"} />}
     {page === "assurance" && <AssurancePage platform={platform} cases={cases} refresh={refreshPlatform} />}
     {page === "case" && selected && <CaseDetail item={selected} onBack={() => navigate({ page: "dashboard" })} refresh={refreshSelected} />}
   </Shell>;
