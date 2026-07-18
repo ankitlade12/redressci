@@ -44,7 +44,7 @@ Open [http://localhost:5173](http://localhost:5173). No login, API key, or propr
 
 Use the **View privacy boundary as** selector in the sidebar to compare reporter, reviewer, developer, administrator, and independent-verifier access. The developer view is served without the reporter name or original transcript.
 
-To exercise the full fresh-report lifecycle, select **Report a failure** and use synthetic information:
+To exercise the full fresh-report lifecycle, select **Report a failure** and use synthetic information. Developers can instead select **Report internal incident** without gaining access to a community reporter's private evidence. Copy-ready examples are in [docs/REPORTING_GUIDE.md](./docs/REPORTING_GUIDE.md).
 
 1. Submit a transcript and optional private artifact.
 2. Compare the original with the proposed redaction and explicitly approve the shared version.
@@ -92,9 +92,12 @@ GPT-5.6 is used for:
 
 AI output never approves privacy, consent, evidence, expected behavior, or verified status. Uploaded content is explicitly treated as untrusted data, not model instructions.
 
+Private attachments are read from encrypted server-side storage. Plain-text files can supply a transcript deterministically; images can supply one when live AI is configured; PDFs remain supporting evidence and require pasted conversation text. Live AI routes are capped by `REDRESSCI_AI_RATE_LIMIT_PER_HOUR` (default `20` per client per hour), and response sizes are bounded.
+
 ## Product capabilities
 
 - Guided, non-technical reporter intake.
+- A distinct internal-incident intake for developers with server-enforced ownership and privacy boundaries.
 - Original/artifact separation from anonymized case data.
 - Name, email, phone, and identifier redaction with explicit approval.
 - Multimodal GPT-5.6 extraction interface with uncertainty.

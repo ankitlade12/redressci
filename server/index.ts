@@ -5,7 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { aiStatus, extractInteraction, proposeIncident } from "./ai.js";
-import { attachIdentity, issueToken, requireRole } from "./auth.js";
+import { attachIdentity, issueToken, requireRole, type Identity } from "./auth.js";
 import { compileCase } from "./compiler.js";
 import { passesValidationGate, runEvaluation, runEvaluationHybrid } from "./evaluation.js";
 import { createDemoCase } from "./fixtures.js";
@@ -46,7 +46,7 @@ import {
   verifyProofBundle,
 } from "./platform.js";
 import { readEncryptedArtifact, storeEncryptedArtifact } from "./secure-storage.js";
-import { createCase, getCase, listCases, resetStore, saveCase } from "./store.js";
+import { createCase, getCase, listCases, parseTranscript, resetStore, saveCase } from "./store.js";
 import type { Assertion } from "../src/types.js";
 import type { SignedProofBundle, WorkspaceRole } from "../src/platform-types.js";
 
@@ -65,6 +65,23 @@ const app = express();
 app.use(express.json({ limit: "2mb" }));
 app.use(attachIdentity);
 
+const aiRequests = new Map<string, number[]>();
+function limitAiUsage(request: express.Request, response: express.Response, next: express.NextFunction) {
+  if (!aiStatus().configured) return next();
+  const now = Date.now();
+  const windowStart = now - 60 * 60 * 1000;
+  const maximum = Math.max(1, Math.min(100, Number(process.env.REDRESSCI_AI_RATE_LIMIT_PER_HOUR) || 20));
+  const key = request.ip || request.socket.remoteAddress || "unknown";
+  const recent = (aiRequests.get(key) || []).filter((timestamp) => timestamp > windowStart);
+  if (recent.length >= maximum) {
+    response.setHeader("Retry-After", "3600");
+    return response.status(429).json({ error: "Live AI limit reached for this hour. The deterministic workflow remains available." });
+  }
+  recent.push(now);
+  aiRequests.set(key, recent);
+  next();
+}
+
 configurePlatformPersistence(root);
 if (!process.env.REDRESSCI_PERSIST) resetPlatform(listCases());
 else listCases().forEach(synchronizeEvidence);
@@ -77,24 +94,63 @@ app.post("/api/auth/demo/:role", (request, response) => {
   if (!member || !["reporter", "reviewer", "developer", "admin", "partner"].includes(role)) return response.status(404).json({ error: "Demo role not found." });
   response.json({ token: issueToken({ id: member.id, name: member.displayName, role, workspaceId: getPlatformState().workspace.id }), member });
 });
-function visibleCase(item: ReturnType<typeof getCase>, role?: WorkspaceRole) {
+function canAccessOriginal(item: NonNullable<ReturnType<typeof getCase>>, identity?: Identity) {
+  if (!identity) return false;
+  if (identity.role === "admin" || identity.role === "reviewer") return true;
+  if (identity.role === "reporter") return item.reporterId === identity.id;
+  return identity.role === "developer" && item.intakeType === "internal-incident" && item.reporterId === identity.id;
+}
+
+function visibleCase(item: ReturnType<typeof getCase>, identity?: Identity) {
   if (!item) return item;
-  if (role === "developer" || role === "partner") return { ...item, reporterName: "[REDACTED]", originalTranscript: "", redactions: item.redactions.map((entry) => ({ ...entry, value: "[PRIVATE]" })) };
+  if (!canAccessOriginal(item, identity)) return {
+    ...item,
+    reporterName: "[REDACTED]",
+    originalTranscript: "",
+    artifacts: [],
+    title: item.privacyApproved ? item.redactedTitle : "Case awaiting privacy review",
+    description: item.privacyApproved ? item.redactedDescription : "[PENDING PRIVACY REVIEW]",
+    userInput: item.privacyApproved ? item.redactedUserInput : "[PENDING PRIVACY REVIEW]",
+    observedResponse: item.privacyApproved ? item.redactedObservedResponse : "[PENDING PRIVACY REVIEW]",
+    redactions: item.redactions.map((entry) => ({ ...entry, value: "[PRIVATE]" })),
+  };
   return item;
 }
 
 app.get("/api/cases", requireRole("reporter", "reviewer", "developer", "admin", "partner"), (request, response) => {
   const available = request.identity?.role === "reporter" ? listCases().filter((item) => item.reporterId === request.identity?.id) : listCases();
-  response.json({ cases: available.map((item) => visibleCase(item, request.identity?.role)) });
+  response.json({ cases: available.map((item) => visibleCase(item, request.identity)) });
 });
 app.get("/api/cases/:id", requireRole("reporter", "reviewer", "developer", "admin", "partner"), (request, response) => {
   const item = getCase(String(request.params.id));
   if (!item) return response.status(404).json({ error: "Case not found" });
   if (request.identity?.role === "reporter" && item.reporterId !== request.identity.id) return response.status(403).json({ error: "Reporters can only access their own cases." });
-  response.json({ case: visibleCase(item, request.identity?.role) });
+  response.json({ case: visibleCase(item, request.identity) });
 });
 
-app.post("/api/cases", requireRole("reporter", "admin"), (request, response) => response.status(201).json({ case: createCase({ ...request.body, reporterId: request.identity?.id }) }));
+app.post("/api/cases", requireRole("reporter", "developer", "admin"), (request, response) => {
+  const text = (value: unknown, maximum: number) => typeof value === "string" ? value.trim().slice(0, maximum) : "";
+  const product = text(request.body.product, 200);
+  const description = text(request.body.description, 5000);
+  const originalTranscript = text(request.body.originalTranscript, 100_000);
+  if (!product) return response.status(400).json({ error: "AI product or system is required." });
+  if (!description) return response.status(400).json({ error: "A description of what went wrong is required." });
+  if (typeof request.body.originalTranscript === "string" && request.body.originalTranscript.length > 100_000) return response.status(413).json({ error: "The pasted transcript is too large. Attach it as a text file instead." });
+  const internal = request.identity?.role === "developer" || (request.identity?.role === "admin" && request.body.intakeType === "internal-incident");
+  const consentOptions = new Set(["Private to reporter", "Shared with responsible organization", "Anonymized research use", "Anonymized public evaluation use"]);
+  const item = createCase({
+    product,
+    description,
+    originalTranscript,
+    title: text(request.body.title, 140) || description.slice(0, 70),
+    expectedBehavior: text(request.body.expectedBehavior, 5000),
+    reporterId: request.identity?.id,
+    intakeType: internal ? "internal-incident" : "affected-person",
+    reporterName: internal ? request.identity?.name || "Internal developer" : text(request.body.reporterName, 120),
+    consent: internal ? "Private workspace incident" : consentOptions.has(request.body.consent) ? request.body.consent : "Private to reporter",
+  });
+  response.status(201).json({ case: visibleCase(item, request.identity) });
+});
 
 app.post("/api/reset", requireRole("admin"), (_request, response) => {
   const item = resetStore();
@@ -102,54 +158,84 @@ app.post("/api/reset", requireRole("admin"), (_request, response) => {
   response.json({ case: item });
 });
 
-app.post("/api/cases/:id/artifacts", requireRole("reporter", "admin"), upload.single("artifact"), (request, response) => {
+app.post("/api/cases/:id/artifacts", requireRole("reporter", "developer", "admin"), upload.single("artifact"), (request, response) => {
   const item = getCase(String(request.params.id));
   if (!item) return response.status(404).json({ error: "Case not found" });
+  if (!canAccessOriginal(item, request.identity)) return response.status(403).json({ error: "You can only attach evidence to reports you own." });
   if (!request.file) return response.status(400).json({ error: "Artifact is required." });
   const artifact = storeEncryptedArtifact(root, { id: `${item.id}--${randomUUID()}`, name: request.file.originalname, type: request.file.mimetype, data: request.file.buffer, region: getPlatformState().workspace.policy.region });
+  item.artifacts.push(artifact);
+  saveCase(item);
   response.status(201).json({ artifact: { ...artifact, private: true } });
 });
 
-app.get("/api/artifacts/:id", requireRole("reporter", "reviewer", "admin"), (request, response, next) => {
+app.get("/api/artifacts/:id", requireRole("reporter", "reviewer", "developer", "admin"), (request, response, next) => {
   try {
     const id = String(request.params.id);
     const item = getCase(id.split("--")[0]);
     if (!item) return response.status(404).json({ error: "Artifact case not found." });
-    if (request.identity?.role === "reporter" && item.reporterId !== request.identity.id) return response.status(403).json({ error: "Reporters can only access artifacts from their own cases." });
-    response.type("application/octet-stream").send(readEncryptedArtifact(root, id));
+    const artifact = item.artifacts.find((entry) => entry.id === id);
+    if (!artifact) return response.status(404).json({ error: "Artifact not found." });
+    if (!canAccessOriginal(item, request.identity)) return response.status(403).json({ error: "This original artifact is outside your privacy boundary." });
+    response.type(artifact.type).send(readEncryptedArtifact(root, id));
   }
   catch (error) { next(error); }
 });
 
-app.post("/api/cases/:id/extract", requireRole("reporter", "reviewer", "admin"), async (request, response, next) => {
+app.post("/api/cases/:id/extract", requireRole("reporter", "reviewer", "developer", "admin"), limitAiUsage, async (request, response, next) => {
   try {
     const item = getCase(String(request.params.id));
     if (!item) return response.status(404).json({ error: "Case not found" });
-    const live = await extractInteraction({ transcript: request.body.transcript || item.originalTranscript, imageDataUrl: request.body.imageDataUrl });
-    const extraction = live || {
-      userInput: item.userInput || "Which nearby cooling center can I enter using a wheelchair?",
-      observedResponse: item.observedResponse || "Central Hall is the closest cooling center.",
-      uncertainText: [],
-      confidence: 0.98,
-      mode: "deterministic demo",
-    };
+    if (!canAccessOriginal(item, request.identity)) return response.status(403).json({ error: "This original evidence is outside your privacy boundary." });
+    let transcript = String(request.body.transcript || item.originalTranscript || "");
+    let imageDataUrl: string | undefined;
+    if (request.body.artifactId) {
+      const artifact = item.artifacts.find((entry) => entry.id === String(request.body.artifactId));
+      if (!artifact) return response.status(404).json({ error: "Private artifact not found for this case." });
+      const data = readEncryptedArtifact(root, artifact.id);
+      if (artifact.type === "text/plain") {
+        if (!transcript.trim()) transcript = data.toString("utf8");
+      } else if (artifact.type.startsWith("image/")) imageDataUrl = `data:${artifact.type};base64,${data.toString("base64")}`;
+      else return response.status(400).json({ error: "PDF files are stored as supporting evidence. Paste the conversation transcript for extraction." });
+    }
+    if (transcript.length > 100_000) return response.status(413).json({ error: "The transcript is too large to extract. Reduce it to the relevant interaction." });
+    if (!transcript.trim() && imageDataUrl && !aiStatus().configured) return response.status(503).json({ error: "Screenshot extraction needs live AI. Paste the transcript or configure OPENAI_API_KEY." });
+    if (!transcript.trim() && !imageDataUrl) return response.status(400).json({ error: "A transcript or screenshot is required for extraction." });
+    const live = await extractInteraction({ transcript, imageDataUrl });
+    const parsed = parseTranscript(transcript);
+    const extraction = live || (parsed.userInput && parsed.observedResponse ? { ...parsed, uncertainText: [], confidence: 1, mode: "deterministic transcript parser" } : null);
+    if (!extraction) return response.status(422).json({ error: "Could not separate the conversation. Label the text with ‘You:’ and ‘AI:’, then try again." });
     item.userInput = extraction.userInput;
     item.observedResponse = extraction.observedResponse;
+    if (!item.originalTranscript.trim()) item.originalTranscript = transcript.trim() || `You: ${extraction.userInput}\nAI: ${extraction.observedResponse}`;
+    if (!item.redactedTranscript.trim()) item.redactedTranscript = item.originalTranscript;
+    item.redactedUserInput = item.userInput;
+    item.redactedObservedResponse = item.observedResponse;
     saveCase(item);
     response.json({ extraction, ai: Boolean(live) });
   } catch (error) { next(error); }
 });
 
-app.post("/api/cases/:id/redact", requireRole("reporter", "reviewer", "admin"), (request, response) => {
+app.post("/api/cases/:id/redact", requireRole("reporter", "reviewer", "developer", "admin"), (request, response) => {
   const item = getCase(String(request.params.id));
   if (!item) return response.status(404).json({ error: "Case not found" });
+  if (!canAccessOriginal(item, request.identity)) return response.status(403).json({ error: "This original evidence is outside your privacy boundary." });
   const source = request.body.transcript || item.originalTranscript;
+  if (!source.trim()) return response.status(400).json({ error: "Privacy review needs a transcript. Extract or paste the conversation first." });
   const { redacted, redactions } = proposeRedaction(source, item.reporterName);
+  const descriptionProposal = proposeRedaction(item.description, item.reporterName);
+  const titleProposal = proposeRedaction(item.title, item.reporterName);
   const candidate = typeof request.body.redactedTranscript === "string" ? request.body.redactedTranscript : redacted;
-  const leaks = findUnredactedPersonalData(candidate, redactions);
+  const candidateDescription = typeof request.body.redactedDescription === "string" ? request.body.redactedDescription : descriptionProposal.redacted;
+  const leaks = [...new Set([...findUnredactedPersonalData(candidate, redactions), ...findUnredactedPersonalData(candidateDescription, descriptionProposal.redactions), ...findUnredactedPersonalData(titleProposal.redacted, titleProposal.redactions)])];
   if (request.body.approve && leaks.length) return response.status(400).json({ error: `Privacy approval blocked. Review possible ${leaks.join(", ")}.`, leaks });
   item.redactedTranscript = candidate;
-  item.redactions = redactions;
+  item.redactedTitle = titleProposal.redacted;
+  item.redactedDescription = candidateDescription;
+  const safeTurns = parseTranscript(candidate);
+  item.redactedUserInput = safeTurns.userInput || "See the approved privacy-safe transcript.";
+  item.redactedObservedResponse = safeTurns.observedResponse || "See the approved privacy-safe transcript.";
+  item.redactions = [...redactions, ...descriptionProposal.redactions, ...titleProposal.redactions];
   item.privacyApproved = Boolean(request.body.approve);
   if (item.privacyApproved) {
     const reviewer = request.body.reviewer || "Reporter";
@@ -160,10 +246,10 @@ app.post("/api/cases/:id/redact", requireRole("reporter", "reviewer", "admin"), 
   }
   item.status = item.privacyApproved ? "Awaiting evidence review" : "Awaiting privacy review";
   saveCase(item);
-  response.json({ redacted, redactions, approved: item.privacyApproved });
+  response.json({ redacted, redactedDescription: descriptionProposal.redacted, redactions: item.redactions, approved: item.privacyApproved });
 });
 
-app.post("/api/cases/:id/structure", requireRole("reviewer", "admin"), async (request, response, next) => {
+app.post("/api/cases/:id/structure", requireRole("reviewer", "admin"), limitAiUsage, async (request, response, next) => {
   try {
     const item = getCase(String(request.params.id));
     if (!item) return response.status(404).json({ error: "Case not found" });
@@ -280,7 +366,7 @@ app.post("/api/cases/:id/runs", requireRole("reviewer", "developer", "admin"), a
   } catch (error) { next(error); }
 });
 
-app.post("/api/cases/:id/validate", requireRole("reviewer", "developer", "admin"), async (request, response, next) => {
+app.post("/api/cases/:id/validate", requireRole("reviewer", "developer", "admin"), limitAiUsage, async (request, response, next) => {
   try {
     const item = getCase(String(request.params.id));
     if (!item || !item.evaluation) return response.status(409).json({ error: "Generate an evaluation before validation." });

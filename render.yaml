@@ -15,3 +15,7 @@ services:
         value: "1"
       - key: REDRESSCI_STORAGE_REGION
         value: us
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: REDRESSCI_AI_RATE_LIMIT_PER_HOUR
+        value: "20"

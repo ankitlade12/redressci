@@ -32,7 +32,15 @@ export function resetStore() {
 
 if (persistenceFile && existsSync(persistenceFile)) {
   const saved = JSON.parse(readFileSync(persistenceFile, "utf8")) as RedressCase[];
-  for (const item of saved) cases.set(item.id, item);
+  for (const item of saved) cases.set(item.id, {
+    ...item,
+    intakeType: item.intakeType || "affected-person",
+    artifacts: item.artifacts || [],
+    redactedTitle: item.redactedTitle || item.title,
+    redactedDescription: item.redactedDescription || item.description,
+    redactedUserInput: item.redactedUserInput || item.userInput,
+    redactedObservedResponse: item.redactedObservedResponse || item.observedResponse,
+  });
 } else resetStore();
 
 export function listCases() {
@@ -50,20 +58,34 @@ export function saveCase(item: RedressCase) {
   return item;
 }
 
+export function parseTranscript(transcript: string) {
+  const userMatch = transcript.match(/(?:^|\n)\s*(?:you|user|reporter|customer)\s*:\s*([^\n]+(?:\n(?!\s*\w+\s*:)[^\n]+)*)/i);
+  const assistantMatch = transcript.match(/(?:^|\n)\s*(?:ai|assistant|bot|agent)\s*:\s*([^\n]+(?:\n(?!\s*\w+\s*:)[^\n]+)*)/i);
+  const turns = [...transcript.matchAll(/(?:^|\n)\s*[^:\n]{1,40}:\s*([^\n]+)/g)].map((match) => match[1].trim());
+  return {
+    userInput: userMatch?.[1]?.trim() || turns[0] || "",
+    observedResponse: assistantMatch?.[1]?.trim() || turns[1] || "",
+  };
+}
+
 export function createCase(input: Partial<RedressCase>) {
   const now = new Date().toISOString();
   const transcript = input.originalTranscript || "";
-  const userMatch = transcript.match(/(?:^|\n)\s*(?:you|user|reporter)\s*:\s*([^\n]+)/i);
-  const assistantMatch = transcript.match(/(?:^|\n)\s*(?:ai|assistant|bot|agent)\s*:\s*([^\n]+(?:\n(?!\s*\w+\s*:)[^\n]+)*)/i);
+  const parsed = parseTranscript(transcript);
   const item: RedressCase = {
     id: `RC-${Math.floor(1000 + Math.random() * 9000)}`,
     reporterId: input.reporterId,
+    intakeType: input.intakeType || "affected-person",
     title: input.title || "New AI failure report",
+    redactedTitle: input.redactedTitle || input.title || "New AI failure report",
     description: input.description || "",
+    redactedDescription: input.redactedDescription || input.description || "",
     product: input.product || "Unspecified AI system",
     reporterName: input.reporterName || "Reporter",
-    userInput: input.userInput || userMatch?.[1]?.trim() || "Interaction supplied in the private artifact",
-    observedResponse: input.observedResponse || assistantMatch?.[1]?.trim() || "Response supplied in the private artifact",
+    userInput: input.userInput || parsed.userInput || "Interaction supplied in the private artifact",
+    observedResponse: input.observedResponse || parsed.observedResponse || "Response supplied in the private artifact",
+    redactedUserInput: input.redactedUserInput || input.userInput || parsed.userInput || "Interaction supplied in the private artifact",
+    redactedObservedResponse: input.redactedObservedResponse || input.observedResponse || parsed.observedResponse || "Response supplied in the private artifact",
     expectedBehavior: input.expectedBehavior || "",
     originalTranscript: input.originalTranscript || "",
     redactedTranscript: input.originalTranscript || "",
@@ -76,13 +98,14 @@ export function createCase(input: Partial<RedressCase>) {
     environment: input.environment || "Web · submitted report",
     status: "Awaiting privacy review",
     synthetic: false,
+    artifacts: input.artifacts || [],
     evidence: input.evidence || [],
     reviewAssertions: input.reviewAssertions || [],
     targetPair: input.targetPair,
     review: input.review || { expectedBehaviorApproved: false },
     runs: [],
     timeline: [
-      { id: randomUUID(), label: "Report received", detail: "Your report was saved privately and is waiting for privacy review.", actor: "Reporter", createdAt: now, complete: true },
+      { id: randomUUID(), label: input.intakeType === "internal-incident" ? "Internal incident received" : "Report received", detail: "The report was saved privately and is waiting for privacy review.", actor: input.intakeType === "internal-incident" ? "Developer" : "Reporter", createdAt: now, complete: true },
     ],
     questions: [],
     createdAt: now,

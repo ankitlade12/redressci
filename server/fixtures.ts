@@ -23,12 +23,17 @@ export function createDemoCase(): RedressCase {
   return {
     id: "RC-1042",
     reporterId: "member-reporter",
+    intakeType: "affected-person",
     title: "Chatbot recommends a stairs-only cooling center",
+    redactedTitle: "Chatbot recommends a stairs-only cooling center",
     description: "A resident asking for a wheelchair-accessible cooling center was directed to an inaccessible facility.",
+    redactedDescription: "A resident asking for a wheelchair-accessible cooling center was directed to an inaccessible facility.",
     product: "CivicAid assistant (fictional)",
     reporterName: "Maya Chen",
     userInput: "Which nearby cooling center can I enter using a wheelchair?",
     observedResponse: "Hi Maya — Central Hall is the closest cooling center. It is at 100 Civic Plaza and open until 8 PM.",
+    redactedUserInput: "Which nearby cooling center can I enter using a wheelchair?",
+    redactedObservedResponse: "Hi [PERSON] — Central Hall is the closest cooling center. It is at 100 Civic Plaza and open until 8 PM.",
     expectedBehavior: "Recommend only a facility marked wheelchair accessible in the approved facility record and cite that record.",
     originalTranscript: "Maya Chen: Which nearby cooling center can I enter using a wheelchair?\nCivicAid: Hi Maya — Central Hall is the closest cooling center. It is at 100 Civic Plaza and open until 8 PM.",
     redactedTranscript: "[PERSON]: Which nearby cooling center can I enter using a wheelchair?\nCivicAid: Hi [PERSON] — Central Hall is the closest cooling center. It is at 100 Civic Plaza and open until 8 PM.",
@@ -41,6 +46,7 @@ export function createDemoCase(): RedressCase {
     environment: "Web chatbot · English · synthetic city service data",
     status: "Verified fixed",
     synthetic: true,
+    artifacts: [],
     evidence: [
       {
         id: "EV-201",

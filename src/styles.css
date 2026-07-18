@@ -304,6 +304,7 @@ main { min-width: 0; }
 .upload-drop small { color: var(--muted); font-size: 9px; margin-top: 3px; }
 .upload-drop > span { padding: 6px 8px; border: 1px solid var(--line); border-radius: 5px; color: var(--ink); font-size: 9px; }
 .upload-drop { position: relative; cursor: pointer; }
+.field-guidance { margin-top: 9px; padding: 10px 12px; border-left: 3px solid #b98732; background: #fbf3df; color: #72551f; font-size: 10px; line-height: 1.5; }
 .file-input { position: absolute; width: 1px !important; height: 1px; opacity: 0; pointer-events: none; }
 .tip { margin-top: 22px; padding: 14px; display: flex; gap: 10px; border: 1px solid #d9d2e0; border-radius: 8px; color: #76518c; background: #f5f0f7; }
 .tip p { margin: 0; color: #6f6674; font-size: 10px; line-height: 1.5; }

@@ -40,10 +40,10 @@ export const api = {
     if (!response.ok) throw new Error(payload.error || "Upload failed");
     return payload;
   },
-  extract: (id: string, body: { transcript?: string; imageDataUrl?: string }) => request(`/api/cases/${id}/extract`, { method: "POST", body: JSON.stringify(body) }),
+  extract: (id: string, body: { transcript?: string; artifactId?: string }) => request<{ extraction: { userInput: string; observedResponse: string; uncertainText: string[]; confidence: number }; ai: boolean }>(`/api/cases/${id}/extract`, { method: "POST", body: JSON.stringify(body) }),
   validate: (id: string) => request<{ verified: boolean; broken: RedressCase["runs"][number]; fixed: RedressCase["runs"][number] }>(`/api/cases/${id}/validate`, { method: "POST", body: "{}" }),
   compile: (id: string) => request(`/api/cases/${id}/compile`, { method: "POST", body: "{}" }),
-  redact: (id: string, transcript: string, approve = true, reviewer = "Reporter", redactedTranscript?: string) => request<{ redacted: string; approved: boolean }>(`/api/cases/${id}/redact`, { method: "POST", body: JSON.stringify({ transcript, approve, reviewer, redactedTranscript }) }),
+  redact: (id: string, transcript: string, approve = true, reviewer = "Reporter", redactedTranscript?: string, redactedDescription?: string) => request<{ redacted: string; redactedDescription: string; approved: boolean }>(`/api/cases/${id}/redact`, { method: "POST", body: JSON.stringify({ transcript, approve, reviewer, redactedTranscript, redactedDescription }) }),
   addEvidence: (id: string, evidence: Omit<Evidence, "id" | "status">) => request<{ evidence: Evidence }>(`/api/cases/${id}/evidence`, { method: "POST", body: JSON.stringify(evidence) }),
   reviewEvidence: (id: string, evidenceId: string, status: "approved" | "rejected", reviewer = "Demo reviewer") => request(`/api/cases/${id}/evidence/${evidenceId}/review`, { method: "POST", body: JSON.stringify({ status, reviewer }) }),
   approveExpectedBehavior: (id: string, body: { expectedBehavior: string; category: string; audience: string; severity: RedressCase["severity"]; reviewer?: string }) => request(`/api/cases/${id}/review-expected-behavior`, { method: "POST", body: JSON.stringify(body) }),
