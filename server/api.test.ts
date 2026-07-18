@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { AddressInfo } from "node:net";
-import { app } from "./index.js";
+
+// The judge-path suite must stay deterministic even when a developer has a
+// live key in .env. Live model access is verified separately.
+process.env.OPENAI_API_KEY = "";
+const { app } = await import("./index.js");
 
 test("judge API path exposes demo, executes gate, and issues a receipt", async (context) => {
   const server = app.listen(0, "127.0.0.1");

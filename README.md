@@ -23,7 +23,7 @@ The central invariant is enforced in application logic: a case cannot become ver
 
 ## Judge quickstart
 
-Requirements: Node.js 20+ and npm. Tested on macOS and designed to run on Linux and Windows.
+Requirements: Node.js 22+ and npm. Tested on macOS and designed to run on Linux and Windows.
 
 ```bash
 npm install
