@@ -2,22 +2,30 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { issueToken, verifyToken, type Identity } from "./auth.js";
 import {
+  createDeploymentProof,
   createProofBundle,
+  createReporterAccessLink,
   dashboard,
   exportDataset,
   getPlatformState,
+  githubCheckBundle,
   patternReport,
   proposeCounterfactuals,
   recordConsent,
+  recordDeploymentVerification,
   resetPlatform,
   reviewCounterfactual,
+  resolveReporterAccessLink,
   runAssuranceSuite,
   sealEscrow,
   synchronizeEvidence,
   updateEvidenceVersion,
+  updateReporterPreferences,
   verifyAuditChain,
+  verifyPlatformDocument,
   verifyProofBundle,
 } from "./platform.js";
+import { runEvaluation } from "./evaluation.js";
 import { getCase, resetStore } from "./store.js";
 
 const admin: Identity = { id: "member-admin", name: "Demo administrator", role: "admin", workspaceId: "workspace-open-public-lab" };
@@ -101,4 +109,56 @@ test("consent history is append-only and withdrawal is explicit", () => {
   assert.equal(decision.action, "withdrawn");
   assert.equal(getPlatformState().consent.at(-1)?.reason, decision.reason);
   assert.equal(verifyAuditChain(), true);
+});
+
+test("private reporter links store only hashes and support scoped preferences", () => {
+  const item = demo();
+  const created = createReporterAccessLink({ ...admin, id: "member-reporter", role: "reporter" }, item);
+  assert.ok(created.token.length >= 24);
+  assert.doesNotMatch(JSON.stringify(getPlatformState()), new RegExp(created.token));
+  const resolved = resolveReporterAccessLink(created.token);
+  assert.equal(resolved.caseId, item.id);
+  const preferences = updateReporterPreferences(created.token, { reviewQuestions: false });
+  assert.equal(preferences.reviewQuestions, false);
+  assert.throws(() => resolveReporterAccessLink(`${created.token}x`), /invalid or expired/);
+});
+
+test("deployed verification produces a distinct signed proof", () => {
+  const item = demo();
+  assert.ok(item.evaluation);
+  const response = item.targetPair?.correctedResponse || "River Library is accessible according to the facility register.";
+  const run = runEvaluation(item.evaluation, "custom", response);
+  item.runs.unshift(run);
+  recordDeploymentVerification(admin, item, {
+    id: "LIVE-TEST",
+    adapterId: "adapter-http",
+    adapterName: "Test deployment",
+    targetVersion: "civicaid@test",
+    endpointOrigin: "https://example.invalid",
+    runId: run.id,
+    responseSha256: "a".repeat(64),
+    state: run.state,
+    verified: run.state === "pass",
+    createdAt: new Date().toISOString(),
+  });
+  const proof = createDeploymentProof(admin, item);
+  assert.equal(verifyPlatformDocument(proof), true);
+  assert.equal(item.status, "Verified fixed");
+});
+
+test("GitHub workflow calls a deployed target and privacy threshold reveals only grouped patterns", () => {
+  const item = demo();
+  const bundle = githubCheckBundle(item);
+  assert.match(bundle.workflow, /REDRESSCI_TARGET_URL/);
+  assert.match(bundle.workflow, /runner\/cli\.ts/);
+  assert.doesNotMatch(bundle.workflow, new RegExp(item.reporterName));
+
+  const second = structuredClone(item); second.id = "RC-2042";
+  const third = structuredClone(item); third.id = "RC-3042";
+  resetPlatform([item, second, third]);
+  const report = patternReport();
+  assert.equal(report.groups.length, 1);
+  assert.equal(report.groups[0].count, 3);
+  assert.ok(report.groups[0].mechanism);
+  assert.ok(report.groups[0].capability);
 });

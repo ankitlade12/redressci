@@ -72,7 +72,7 @@ export function deterministicGrade(evaluation: EvaluationCase, response: string)
   });
 }
 
-export function runEvaluation(evaluation: EvaluationCase, target: "broken" | "fixed", targetResponse?: string): EvaluationRun {
+export function runEvaluation(evaluation: EvaluationCase, target: EvaluationRun["target"], targetResponse?: string): EvaluationRun {
   const started = performance.now();
   const response = targetResponse ?? (target === "broken" ? brokenResponse : fixedResponse);
   const assertionResults = deterministicGrade(evaluation, response);
@@ -82,7 +82,7 @@ export function runEvaluation(evaluation: EvaluationCase, target: "broken" | "fi
     id: `RUN-${randomUUID().slice(0, 8).toUpperCase()}`,
     caseId: evaluation.id,
     target,
-    targetVersion: target === "broken" ? "civicaid@1.3-broken" : "civicaid@1.4-fixed",
+    targetVersion: target === "broken" ? "civicaid@1.3-broken" : target === "fixed" ? "civicaid@1.4-fixed" : "deployed-candidate",
     model: "demo-rule-target",
     promptVersion: semanticGraderPromptVersion,
     response,
@@ -94,7 +94,7 @@ export function runEvaluation(evaluation: EvaluationCase, target: "broken" | "fi
   };
 }
 
-export async function runEvaluationHybrid(evaluation: EvaluationCase, target: "broken" | "fixed", targetResponse?: string) {
+export async function runEvaluationHybrid(evaluation: EvaluationCase, target: EvaluationRun["target"], targetResponse?: string) {
   const started = performance.now();
   const run = runEvaluation(evaluation, target, targetResponse);
   if (!aiStatus().configured) return run;

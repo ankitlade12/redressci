@@ -23,6 +23,12 @@
 - Reporter-safe timeline, portable case export, CI runner, and Redress Receipt.
 - Assurance Network dashboard spanning roadmap phases 1–4.
 - Ed25519-signed receipts and portable proof bundles with built-in verification.
+- Live deployed-target verification with a separate signed deployment proof and truthful `Verified fixed` transition.
+- Expiring, revocable private reporter status links with notification preferences and consent withdrawal.
+- GPT-5.6 public evidence discovery that stores unapproved candidates and never bypasses reviewer approval.
+- Generated deployed-target GitHub Actions checks plus optional GitHub Checks API publication.
+- Privacy-thresholded failure radar with mechanism/capability summaries and small-group suppression.
+- Accessible browser voice input that remains editable and stores only submitted text in RedressCI.
 
 ## All-phase engineering foundation
 
@@ -80,7 +86,7 @@
 
 ## Automated verification
 
-The suite currently covers 32 checks, including:
+The suite currently covers 35 checks, including:
 
 - broken-target failure and corrected-target success;
 - validation-gate ordering;
@@ -100,6 +106,9 @@ The suite currently covers 32 checks, including:
 - counterfactual review, sealed escrow, interoperability exports, and privacy thresholding; and
 - all-phase API surfaces and role denial.
 - canonical product URLs and safe route fallback behavior.
+- reporter-link token hashing, scoped preferences, and invalid-token rejection;
+- signed deployed-verification proof separation; and
+- live-target GitHub workflow generation plus privacy-thresholded radar disclosure.
 
 Run:
 

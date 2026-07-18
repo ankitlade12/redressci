@@ -50,6 +50,8 @@ if (persistenceFile && existsSync(persistenceFile)) {
       redactedDescription: item.redactedDescription || item.description,
       redactedUserInput: item.redactedUserInput || item.userInput,
       redactedObservedResponse: item.redactedObservedResponse || item.observedResponse,
+      evidenceSuggestions: item.evidenceSuggestions || [],
+      liveVerifications: item.liveVerifications || [],
       timeline: item.timeline.map((event) => event.label === "Fix independently verified" ? {
         ...event,
         label: "Recorded correction verified",
@@ -125,6 +127,8 @@ export function createCase(input: Partial<RedressCase>) {
       { id: randomUUID(), label: input.intakeType === "internal-incident" ? "Internal incident received" : "Report received", detail: "The report was saved privately and is waiting for privacy review.", actor: input.intakeType === "internal-incident" ? "Developer" : "Reporter", createdAt: now, complete: true },
     ],
     questions: [],
+    evidenceSuggestions: [],
+    liveVerifications: [],
     createdAt: now,
     updatedAt: now,
   };

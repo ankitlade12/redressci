@@ -17,5 +17,13 @@ services:
         value: us
       - key: OPENAI_API_KEY
         sync: false
+      - key: REDRESSCI_TARGET_ALLOWLIST
+        sync: false
+      - key: REDRESSCI_TARGET_TOKEN
+        sync: false
+      - key: REDRESSCI_GITHUB_REPOSITORY
+        sync: false
+      - key: REDRESSCI_GITHUB_TOKEN
+        sync: false
       - key: REDRESSCI_AI_RATE_LIMIT_PER_HOUR
         value: "20"

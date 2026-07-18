@@ -95,6 +95,43 @@ export interface TargetAdapter {
   enabled: boolean;
 }
 
+export interface ReporterAccessLink {
+  id: string;
+  caseId: string;
+  tokenHash: string;
+  createdBy: string;
+  createdAt: string;
+  expiresAt: string;
+  lastViewedAt?: string;
+  preferences: { statusUpdates: boolean; reviewQuestions: boolean; receiptReady: boolean };
+}
+
+export interface ReporterStatusView {
+  caseId: string;
+  title: string;
+  product: string;
+  status: string;
+  consent: string;
+  updatedAt: string;
+  expectedBehavior?: string;
+  timeline: Array<{ label: string; detail: string; createdAt: string; complete: boolean }>;
+  receiptAvailable: boolean;
+  deploymentVerified: boolean;
+  preferences: ReporterAccessLink["preferences"];
+  privacyNotice: string;
+}
+
+export interface GitHubCheckBundle {
+  caseId: string;
+  evaluationId: string;
+  workflowPath: ".github/workflows/redressci.yml";
+  evaluationPath: string;
+  workflow: string;
+  requiredSecrets: string[];
+  checkName: "RedressCI deployed regression";
+  generatedAt: string;
+}
+
 export interface DatasetExport {
   provider: "langsmith" | "braintrust" | "langfuse" | "oecd";
   exportedAt: string;
@@ -254,7 +291,7 @@ export interface RecurrenceEvent {
 export interface PatternReport {
   generatedAt: string;
   threshold: number;
-  groups: Array<{ fingerprint: string; count: number; severity: string; publishable: boolean }>;
+  groups: Array<{ fingerprint: string; mechanism: string; capability: string; count: number; severity: string; publishable: boolean }>;
   suppressedGroups: number;
   privacyNotice: string;
 }
@@ -276,6 +313,7 @@ export interface PlatformState {
   packs: EvaluationPack[];
   escrows: EscrowRecord[];
   integrations: Integration[];
+  reporterLinks: ReporterAccessLink[];
   recurrence: RecurrenceEvent[];
   audit: AuditEvent[];
 }
@@ -301,6 +339,7 @@ export interface PlatformDashboard {
     pattern: PatternReport;
   };
   integrations: Integration[];
+  adapters: TargetAdapter[];
   packs: EvaluationPack[];
   reviewQueue: ReviewTask[];
   auditHead: string;

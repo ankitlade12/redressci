@@ -7,11 +7,12 @@ import {
   randomBytes,
   randomUUID,
   sign,
+  timingSafeEqual,
   verify,
 } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import type { RedressCase } from "../src/types.js";
+import type { LiveVerification, RedressCase } from "../src/types.js";
 import type {
   AuditEvent,
   CalibrationReport,
@@ -24,11 +25,13 @@ import type {
   EvidenceVersion,
   FailureFingerprint,
   Integration,
+  GitHubCheckBundle,
   MutationReport,
   PatternReport,
   PlatformDashboard,
   PlatformState,
   RecurrenceEvent,
+  ReporterAccessLink,
   ScopeGuardReport,
   SignedProofBundle,
   SloRecord,
@@ -93,10 +96,11 @@ function platformSeed(): PlatformState {
     ],
     mutations: [], calibration: [], stability: [], scopeGuards: [], fingerprints: [], counterfactuals: [], packs: [], escrows: [],
     integrations: [
-      { id: "integration-github", kind: "github", label: "GitHub status checks", state: "configured", externalReference: "ankitlade12/redressci" },
-      { id: "integration-webhook", kind: "webhook", label: "Release protection webhook", state: "configured" },
+      { id: "integration-github", kind: "github", label: "GitHub status checks", state: process.env.REDRESSCI_GITHUB_TOKEN && process.env.REDRESSCI_GITHUB_REPOSITORY ? "configured" : "disabled", externalReference: process.env.REDRESSCI_GITHUB_REPOSITORY },
+      { id: "integration-webhook", kind: "webhook", label: "Release protection webhook", state: process.env.REDRESSCI_RELEASE_WEBHOOK ? "configured" : "disabled" },
       { id: "integration-slack", kind: "slack", label: "Reviewer notifications", state: "disabled" },
     ],
+    reporterLinks: [],
     recurrence: [],
     audit: [],
   };
@@ -112,6 +116,7 @@ export function configurePlatformPersistence(root: string) {
   persistenceFile = path.join(dir, "platform.json");
   if (existsSync(persistenceFile)) {
     state = JSON.parse(readFileSync(persistenceFile, "utf8")) as PlatformState;
+    state.reporterLinks ||= [];
   } else persist();
 }
 
@@ -291,6 +296,125 @@ export async function executeAdapter(adapterId: string, input: { message: string
   const output = body.output ?? body.response ?? body.text;
   if (typeof output !== "string") throw new Error("Target response must contain output, response, or text.");
   return output;
+}
+
+export function adapterMetadata(adapterId: string) {
+  const adapter = state.adapters.find((entry) => entry.id === adapterId);
+  if (!adapter) throw new Error("Adapter not found.");
+  return { ...adapter, endpointOrigin: adapter.baseUrl ? new URL(adapter.baseUrl).origin : "not-configured" };
+}
+
+export function recordDeploymentVerification(identity: Identity, item: RedressCase, verification: LiveVerification) {
+  item.liveVerifications.unshift(verification);
+  item.liveVerifications = item.liveVerifications.slice(0, 20);
+  if (verification.verified) item.status = "Verified fixed";
+  appendAudit(identity, verification.verified ? "deployment.verified" : "deployment.failed", "case", item.id, {
+    adapterId: verification.adapterId,
+    targetVersion: verification.targetVersion,
+    runId: verification.runId,
+    responseSha256: verification.responseSha256,
+  });
+  return verification;
+}
+
+export function createDeploymentProof(identity: Identity, item: RedressCase) {
+  const verification = item.liveVerifications.find((entry) => entry.verified);
+  const run = verification && item.runs.find((entry) => entry.id === verification.runId);
+  if (!item.evaluation || !verification || !run) throw new Error("A successful deployed-system verification is required.");
+  const document = {
+    type: "redressci-deployment-proof",
+    version: "1.0",
+    caseId: item.id,
+    evaluationId: item.evaluation.id,
+    evaluationSha256: digest(item.evaluation),
+    verification,
+    runSha256: digest(run),
+    scopeNotice: "This proof covers one reviewed behavior against one configured endpoint and target version.",
+    issuedAt: now(),
+    issuer: state.workspace.id,
+  };
+  const signed = signPlatformDocument(document);
+  appendAudit(identity, "deployment-proof.issued", "case", item.id, { verificationId: verification.id });
+  return signed;
+}
+
+function tokenMatches(candidate: string, storedHash: string) {
+  const candidateHash = Buffer.from(digest(candidate), "hex");
+  const stored = Buffer.from(storedHash, "hex");
+  return candidateHash.length === stored.length && timingSafeEqual(candidateHash, stored);
+}
+
+export function createReporterAccessLink(identity: Identity, item: RedressCase) {
+  for (const existing of state.reporterLinks.filter((entry) => entry.caseId === item.id)) existing.expiresAt = now();
+  const token = randomBytes(24).toString("base64url");
+  const link: ReporterAccessLink = {
+    id: `LINK-${randomUUID().slice(0, 8).toUpperCase()}`,
+    caseId: item.id,
+    tokenHash: digest(token),
+    createdBy: identity.id,
+    createdAt: now(),
+    expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    preferences: { statusUpdates: true, reviewQuestions: true, receiptReady: true },
+  };
+  state.reporterLinks.push(link);
+  appendAudit(identity, "reporter-link.created", "case", item.id, { linkId: link.id, expiresAt: link.expiresAt });
+  return { token, expiresAt: link.expiresAt };
+}
+
+export function resolveReporterAccessLink(token: string) {
+  const link = state.reporterLinks.find((entry) => tokenMatches(token, entry.tokenHash));
+  if (!link || new Date(link.expiresAt).getTime() <= Date.now()) throw new Error("This private status link is invalid or expired.");
+  link.lastViewedAt = now();
+  persist();
+  return link;
+}
+
+export function updateReporterPreferences(token: string, input: Partial<ReporterAccessLink["preferences"]>) {
+  const link = resolveReporterAccessLink(token);
+  link.preferences = {
+    statusUpdates: input.statusUpdates ?? link.preferences.statusUpdates,
+    reviewQuestions: input.reviewQuestions ?? link.preferences.reviewQuestions,
+    receiptReady: input.receiptReady ?? link.preferences.receiptReady,
+  };
+  persist();
+  return link.preferences;
+}
+
+export function githubCheckBundle(item: RedressCase): GitHubCheckBundle {
+  if (!item.evaluation) throw new Error("Compile an evaluation before generating a GitHub check.");
+  const evaluationPath = `evals/${item.evaluation.id}.json`;
+  const workflow = `name: RedressCI deployed regression\n\non:\n  pull_request:\n  push:\n    branches: [main]\n\npermissions:\n  contents: read\n\njobs:\n  redressci:\n    name: RedressCI deployed regression\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-node@v4\n        with:\n          node-version: 22\n          cache: npm\n      - run: npm ci\n      - name: Call the deployed target\n        env:\n          TARGET_URL: \${{ secrets.REDRESSCI_TARGET_URL }}\n          TARGET_TOKEN: \${{ secrets.REDRESSCI_TARGET_TOKEN }}\n          CASE_INPUT: ${JSON.stringify(item.evaluation.input.message)}\n        run: |\n          test -n \"$TARGET_URL\"\n          curl --fail --silent --show-error --max-time 30 \\\n            -H \"Content-Type: application/json\" \\\n            -H \"Authorization: Bearer $TARGET_TOKEN\" \\\n            --data \"$(jq -cn --arg message \"$CASE_INPUT\" '{message: $message}')\" \\\n            \"$TARGET_URL\" > target.json\n          jq -er '.output // .response // .text' target.json > target-response.txt\n      - name: Evaluate the deployed response\n        run: npx tsx runner/cli.ts ${evaluationPath} --target fixed --response \"$(cat target-response.txt)\"\n      - uses: actions/upload-artifact@v4\n        if: always()\n        with:\n          name: redressci-results\n          path: results/*.json\n`;
+  return { caseId: item.id, evaluationId: item.evaluation.id, workflowPath: ".github/workflows/redressci.yml", evaluationPath, workflow, requiredSecrets: ["REDRESSCI_TARGET_URL", "REDRESSCI_TARGET_TOKEN"], checkName: "RedressCI deployed regression", generatedAt: now() };
+}
+
+export async function publishGitHubCheck(identity: Identity, item: RedressCase, commitSha: string) {
+  const token = process.env.REDRESSCI_GITHUB_TOKEN;
+  const repository = process.env.REDRESSCI_GITHUB_REPOSITORY;
+  if (!token || !repository || !/^[\w.-]+\/[\w.-]+$/.test(repository)) throw new Error("Configure REDRESSCI_GITHUB_TOKEN and REDRESSCI_GITHUB_REPOSITORY before publishing checks.");
+  if (!/^[a-f0-9]{40}$/i.test(commitSha)) throw new Error("A full 40-character commit SHA is required.");
+  const verification = item.liveVerifications[0];
+  const conclusion = verification?.verified ? "success" : verification ? "failure" : "neutral";
+  const result = await fetch(`https://api.github.com/repos/${repository}/check-runs`, {
+    method: "POST",
+    headers: { Accept: "application/vnd.github+json", Authorization: `Bearer ${token}`, "Content-Type": "application/json", "User-Agent": "RedressCI", "X-GitHub-Api-Version": "2022-11-28" },
+    body: JSON.stringify({
+      name: "RedressCI deployed regression",
+      head_sha: commitSha,
+      status: "completed",
+      conclusion,
+      output: {
+        title: verification?.verified ? "Deployed fix verified" : verification ? "Deployed regression failed" : "Deployment verification has not run",
+        summary: `Case ${item.id} · evaluation ${item.evaluation?.id || "not compiled"}`,
+      },
+    }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!result.ok) throw new Error(`GitHub Checks API returned HTTP ${result.status}.`);
+  const payload = await result.json() as { id: number; html_url?: string };
+  const integration = state.integrations.find((entry) => entry.id === "integration-github");
+  if (integration) integration.lastDelivery = { state: "success", at: now(), event: `check_run:${payload.id}` };
+  appendAudit(identity, "github-check.published", "case", item.id, { repository, commitSha, checkRunId: payload.id, conclusion });
+  return { id: payload.id, url: payload.html_url, conclusion };
 }
 
 export function exportDataset(item: RedressCase, provider: DatasetExport["provider"]): DatasetExport {
@@ -517,7 +641,14 @@ export function patternReport(): PatternReport {
   const groups = new Map<string, FailureFingerprint[]>();
   for (const fingerprint of state.fingerprints) groups.set(fingerprint.digest, [...(groups.get(fingerprint.digest) || []), fingerprint]);
   const threshold = state.workspace.policy.minimumPatternCount;
-  const summaries = [...groups.entries()].map(([fingerprint, entries]) => ({ fingerprint, count: entries.length, severity: "mixed", publishable: entries.length >= threshold }));
+  const summaries = [...groups.entries()].map(([fingerprint, entries]) => ({
+    fingerprint,
+    mechanism: entries[0]?.mechanism || "unknown",
+    capability: entries[0]?.capability || "unknown",
+    count: entries.length,
+    severity: "mixed",
+    publishable: entries.length >= threshold,
+  }));
   return { generatedAt: now(), threshold, groups: summaries.filter((entry) => entry.publishable), suppressedGroups: summaries.filter((entry) => !entry.publishable).length, privacyNotice: `Groups smaller than ${threshold} are suppressed to reduce re-identification risk.` };
 }
 
@@ -571,7 +702,7 @@ export function dashboard(cases: RedressCase[]): PlatformDashboard {
       recurrences: state.recurrence.length,
     },
     latest: { mutation: latestMutation, calibration: latestCalibration, stability: latestStability, scopeGuard: latest(state.scopeGuards), pattern: patternReport() },
-    integrations: state.integrations, packs: state.packs, reviewQueue: state.reviewQueue, auditHead: state.audit.at(-1)?.hash || "0".repeat(64),
+    integrations: state.integrations, adapters: state.adapters, packs: state.packs, reviewQueue: state.reviewQueue, auditHead: state.audit.at(-1)?.hash || "0".repeat(64),
   };
 }
 

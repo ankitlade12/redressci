@@ -119,6 +119,31 @@ export interface PrivateArtifact {
   createdAt: string;
 }
 
+export interface EvidenceSuggestion {
+  id: string;
+  title: string;
+  locator: string;
+  excerpt: string;
+  authority: "authoritative" | "reviewer";
+  rationale: string;
+  sourceType: "public-web" | "workspace-policy" | "reviewer-draft";
+  status: "proposed" | "accepted" | "dismissed";
+  createdAt: string;
+}
+
+export interface LiveVerification {
+  id: string;
+  adapterId: string;
+  adapterName: string;
+  targetVersion: string;
+  endpointOrigin: string;
+  runId: string;
+  responseSha256: string;
+  state: ResultState;
+  verified: boolean;
+  createdAt: string;
+}
+
 export interface RedressCase {
   id: string;
   reporterId?: string;
@@ -154,6 +179,8 @@ export interface RedressCase {
   runs: EvaluationRun[];
   timeline: TimelineEvent[];
   questions: string[];
+  evidenceSuggestions: EvidenceSuggestion[];
+  liveVerifications: LiveVerification[];
   createdAt: string;
   updatedAt: string;
 }

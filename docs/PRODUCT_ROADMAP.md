@@ -182,6 +182,7 @@ Establish Remediation CI as a new developer-tool category: every valid, consente
 7. ✅ Implement the assurance, community-pack, and remediation-network foundations as executable product surfaces.
 8. Next: deploy the judge build and record the three-minute narration centered on proof.
 9. Next: use pilot conversations to validate evidence review, reporter closure, governance, and SLO assumptions with real participants.
+10. ✅ Add the Live Remediation Loop, private reporter closure links, reviewed evidence discovery, deployed-target GitHub checks, privacy-safe radar, and accessible voice intake.
 
 ## Completion semantics
 
