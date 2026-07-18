@@ -59,9 +59,49 @@ test("judge API path exposes demo, executes gate, and issues a receipt", async (
   assert.equal(forbiddenPolicyUpdate.status, 403);
 
   const developerAuth = await fetch(`${base}/api/auth/demo/developer`, { method: "POST" }).then((response) => response.json()) as { token: string };
-  const developerView = await fetch(`${base}/api/cases/RC-1042`, { headers: { Authorization: `Bearer ${developerAuth.token}` } }).then((response) => response.json()) as { case: { reporterName: string; originalTranscript: string } };
+  const developerView = await fetch(`${base}/api/cases/RC-1042`, { headers: { Authorization: `Bearer ${developerAuth.token}` } }).then((response) => response.json()) as { case: { reporterName: string; originalTranscript: string; artifacts: unknown[]; userInput: string } };
   assert.equal(developerView.case.reporterName, "[REDACTED]");
   assert.equal(developerView.case.originalTranscript, "");
+  assert.deepEqual(developerView.case.artifacts, []);
+  assert.equal(developerView.case.userInput, "Which nearby cooling center can I enter using a wheelchair?");
+
+  const internalResponse = await fetch(`${base}/api/cases`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${developerAuth.token}` },
+    body: JSON.stringify({ product: "Internal support assistant", description: "The assistant returned an incorrect refund rule.", consent: "Anonymized public evaluation use" }),
+  });
+  const internal = await internalResponse.json() as { case: { id: string; intakeType: string; reporterId: string; consent: string; originalTranscript: string } };
+  assert.equal(internalResponse.status, 201);
+  assert.equal(internal.case.intakeType, "internal-incident");
+  assert.equal(internal.case.reporterId, "member-developer");
+  assert.equal(internal.case.consent, "Private workspace incident");
+  assert.equal(internal.case.originalTranscript, "");
+
+  const evidenceForm = new FormData();
+  evidenceForm.append("artifact", new Blob(["You: Why was my refund denied?\nAI: Your refund was denied because the window expired."], { type: "text/plain" }), "conversation.txt");
+  const uploadResponse = await fetch(`${base}/api/cases/${internal.case.id}/artifacts`, { method: "POST", headers: { Authorization: `Bearer ${developerAuth.token}` }, body: evidenceForm });
+  const uploaded = await uploadResponse.json() as { artifact: { id: string; encrypted: boolean; type: string } };
+  assert.equal(uploadResponse.status, 201);
+  assert.equal(uploaded.artifact.encrypted, true);
+  assert.equal(uploaded.artifact.type, "text/plain");
+
+  const extractionResponse = await fetch(`${base}/api/cases/${internal.case.id}/extract`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${developerAuth.token}` },
+    body: JSON.stringify({ artifactId: uploaded.artifact.id }),
+  });
+  const extracted = await extractionResponse.json() as { extraction: { userInput: string; observedResponse: string }; ai: boolean; error?: string };
+  assert.equal(extractionResponse.status, 200, extracted.error);
+  assert.equal(extracted.ai, false);
+  assert.equal(extracted.extraction.userInput, "Why was my refund denied?");
+  assert.match(extracted.extraction.observedResponse, /window expired/);
+  const extractedCase = await fetch(`${base}/api/cases/${internal.case.id}`, { headers: { Authorization: `Bearer ${developerAuth.token}` } }).then((response) => response.json()) as { case: { originalTranscript: string } };
+  assert.match(extractedCase.case.originalTranscript, /Why was my refund denied/);
+
+  const reporterCrossUpload = new FormData();
+  reporterCrossUpload.append("artifact", new Blob(["private"], { type: "text/plain" }), "private.txt");
+  const deniedUpload = await fetch(`${base}/api/cases/${internal.case.id}/artifacts`, { method: "POST", headers: { Authorization: `Bearer ${reporterAuth.token}` }, body: reporterCrossUpload });
+  assert.equal(deniedUpload.status, 403);
 
   const invalidTokenResponse = await fetch(`${base}/api/platform`, { headers: { Authorization: "Bearer invalid.token" } });
   assert.equal(invalidTokenResponse.status, 403);

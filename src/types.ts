@@ -107,15 +107,31 @@ export interface CaseReview {
   expectedBehaviorApprovedAt?: string;
 }
 
+export interface PrivateArtifact {
+  id: string;
+  name: string;
+  type: string;
+  bytes: number;
+  sha256: string;
+  storageRegion: string;
+  encrypted: true;
+  createdAt: string;
+}
+
 export interface RedressCase {
   id: string;
   reporterId?: string;
+  intakeType: "affected-person" | "internal-incident";
   title: string;
+  redactedTitle: string;
   description: string;
+  redactedDescription: string;
   product: string;
   reporterName: string;
   userInput: string;
   observedResponse: string;
+  redactedUserInput: string;
+  redactedObservedResponse: string;
   expectedBehavior: string;
   redactedTranscript: string;
   originalTranscript: string;
@@ -128,6 +144,7 @@ export interface RedressCase {
   environment: string;
   status: CaseStatus;
   synthetic: boolean;
+  artifacts: PrivateArtifact[];
   evidence: Evidence[];
   reviewAssertions: Assertion[];
   targetPair?: TargetPair;

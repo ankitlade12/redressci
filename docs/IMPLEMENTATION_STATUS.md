@@ -6,7 +6,9 @@
 
 - Credential-free seeded judge demonstration.
 - Fresh reporter-created case workflow.
+- Separate developer-owned internal incident workflow without access to community originals.
 - Text transcript parsing and private artifact upload.
+- Case-linked encrypted artifact metadata, server-side text/image extraction, and explicit PDF behavior.
 - Optional GPT-5.6 image/text extraction using strict structured output.
 - Proposed redaction for names, email, phone, and account identifiers.
 - Side-by-side human privacy approval with leak rechecking.
@@ -27,6 +29,7 @@
 ### Phase 1 — Design-partner pilot
 
 - HMAC-signed bearer identities and enforced reporter/reviewer/developer/admin/partner roles.
+- Owner checks for original artifact upload, download, extraction, and privacy approval.
 - Append-only consent history with explicit withdrawal.
 - AES-256-GCM private artifact storage and region metadata.
 - Optional durable local state with atomic writes plus a complete PostgreSQL migration under `db/migrations/`.
@@ -72,6 +75,8 @@
 6. Both recorded target responses are required before validation.
 7. Verified status cannot be set until comparative execution succeeds.
 8. A Redress Receipt cannot be issued without stored broken/fixed proof.
+9. Developer incident reporting never grants access to another reporter's original narrative or artifacts.
+10. Privileged case state cannot be injected through public intake fields.
 
 ## Automated verification
 

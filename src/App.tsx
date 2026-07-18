@@ -21,14 +21,14 @@ function Logo({ onDashboard }: { onDashboard?: () => void }) {
 const roleLabels: Record<WorkspaceRole, string> = { reporter: "Reporter", reviewer: "Reviewer", developer: "Developer", admin: "Administrator", partner: "Verifier" };
 
 function Shell({ children, page, onNavigate, onReport, ai, role, roleBusy, onRoleChange }: { children: React.ReactNode; page: Page; onNavigate: (page: Page) => void; onReport: () => void; ai: boolean; role: WorkspaceRole; roleBusy: boolean; onRoleChange: (role: WorkspaceRole) => void }) {
-  const canReport = role === "reporter" || role === "admin";
+  const canReport = role === "reporter" || role === "developer" || role === "admin";
   return <div className="app-shell">
     <aside className="sidebar">
       <Logo onDashboard={() => onNavigate("dashboard")} />
       <nav aria-label="Main navigation">
         <button className={page === "dashboard" ? "active" : ""} onClick={() => onNavigate("dashboard")}><Icon name="grid" />Cases</button>
         {role !== "reporter" && <button className={page === "assurance" ? "active" : ""} onClick={() => onNavigate("assurance")}><Icon name="shield" />Assurance network</button>}
-        <button onClick={onReport} disabled={!canReport} title={canReport ? "Create a private report" : "Switch to Reporter to submit a report"}><Icon name="plus" />Report a failure</button>
+        <button onClick={onReport} disabled={!canReport} title={canReport ? "Create a private report" : "Reporter, Developer, or Administrator access is required"}><Icon name="plus" />{role === "developer" ? "Report internal incident" : "Report a failure"}</button>
       </nav>
       <div className="sidebar-spacer" />
       <div className="workspace-card role-card">
@@ -135,7 +135,7 @@ const tabs: Array<{ id: CaseTab; label: string; icon: string }> = [
   { id: "overview", label: "Overview", icon: "file" }, { id: "evidence", label: "Evidence", icon: "evidence" }, { id: "evaluation", label: "Evaluation", icon: "code" }, { id: "validation", label: "Validation", icon: "flask" }, { id: "timeline", label: "Timeline", icon: "timeline" }, { id: "ci", label: "CI export", icon: "download" },
 ];
 
-function CaseDetail({ item, onBack, refresh }: { item: RedressCase; onBack: () => void; refresh: () => Promise<void> }) {
+function CaseDetail({ item, onBack, refresh, role }: { item: RedressCase; onBack: () => void; refresh: () => Promise<void>; role: WorkspaceRole }) {
   const [tab, setTab] = useState<CaseTab>("overview");
   const [running, setRunning] = useState(false);
   const [freshRuns, setFreshRuns] = useState<{ broken: EvaluationRun; fixed: EvaluationRun } | null>(null);
@@ -154,7 +154,7 @@ function CaseDetail({ item, onBack, refresh }: { item: RedressCase; onBack: () =
     </header>
     <div className="case-content">
       {notice && <div className="notice"><Icon name="check" size={17} />{notice}</div>}
-      {!item.synthetic && item.status !== "Verified fixed" && <ReviewWorkspace item={item} refresh={refresh} setTab={setTab} />}
+      {!item.synthetic && item.status !== "Verified fixed" && <ReviewWorkspace item={item} refresh={refresh} setTab={setTab} role={role} />}
       {tab === "overview" && <Overview item={item} setTab={setTab} />}
       {tab === "evidence" && <EvidenceView item={item} />}
       {tab === "evaluation" && <EvaluationView item={item} setTab={setTab} />}
@@ -165,10 +165,11 @@ function CaseDetail({ item, onBack, refresh }: { item: RedressCase; onBack: () =
   </div>;
 }
 
-function ReviewWorkspace({ item, refresh, setTab }: { item: RedressCase; refresh: () => Promise<void>; setTab: (tab: CaseTab) => void }) {
+function ReviewWorkspace({ item, refresh, setTab, role }: { item: RedressCase; refresh: () => Promise<void>; setTab: (tab: CaseTab) => void; role: WorkspaceRole }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [redacted, setRedacted] = useState(item.redactedTranscript);
+  const [redactedDescription, setRedactedDescription] = useState(item.redactedDescription);
   const [review, setReview] = useState({
     sourceTitle: "",
     sourceLocator: "",
@@ -187,7 +188,7 @@ function ReviewWorkspace({ item, refresh, setTab }: { item: RedressCase; refresh
 
   const approvePrivacy = async () => {
     setBusy(true); setError("");
-    try { await api.redact(item.id, item.originalTranscript, true, item.reporterName || "Reporter", redacted); await refresh(); }
+    try { await api.redact(item.id, item.originalTranscript, true, item.reporterName || "Reporter", redacted, redactedDescription); await refresh(); }
     catch (reason) { setError(reason instanceof Error ? reason.message : "Privacy approval failed"); }
     finally { setBusy(false); }
   };
@@ -229,12 +230,18 @@ function ReviewWorkspace({ item, refresh, setTab }: { item: RedressCase; refresh
     finally { setBusy(false); }
   };
 
+  const ownsPrivateIntake = role === "reporter" || role === "admin" || role === "reviewer" || (role === "developer" && item.intakeType === "internal-incident" && Boolean(item.originalTranscript));
+  if (!item.privacyApproved && !ownsPrivateIntake) return <section className="review-ready card"><span><Icon name="lock" /></span><div><strong>Privacy review is still in progress.</strong><p>Developers receive only the approved, redacted case—not the reporter’s original evidence.</p></div></section>;
+
   if (!item.privacyApproved) return <section className="review-workspace card">
     <div className="review-heading"><span className="review-step">REVIEW 1 OF 2</span><div><h2>Approve the privacy-safe case</h2><p>Compare the private original with the version developers will see. Edit the redacted copy before approving it.</p></div><Icon name="lock" /></div>
     {error && <div className="form-error"><Icon name="alert" size={15} />{error}</div>}
+    <div className="redaction-grid"><label><span>PRIVATE IMPACT DESCRIPTION</span><textarea value={item.description} readOnly rows={4} /></label><label><span>SHARED IMPACT DESCRIPTION</span><textarea value={redactedDescription} onChange={(event) => setRedactedDescription(event.target.value)} rows={4} /></label></div>
     <div className="redaction-grid"><label><span>PRIVATE ORIGINAL</span><textarea value={item.originalTranscript} readOnly rows={7} /></label><label><span>SHARED AFTER APPROVAL</span><textarea value={redacted} onChange={(event) => setRedacted(event.target.value)} rows={7} /></label></div>
     <div className="review-footer"><p><Icon name="shield" size={16} />This approval controls developer access. It does not publish the case.</p><button className="button dark" disabled={busy || !redacted.trim()} onClick={approvePrivacy}>{busy ? "Approving…" : "Approve redaction"}<Icon name="arrow" size={15} /></button></div>
   </section>;
+
+  if (!item.evaluation && role !== "reviewer" && role !== "admin") return <section className="review-ready card"><span><Icon name="evidence" /></span><div><strong>Privacy is approved; evidence review is next.</strong><p>An assigned reviewer must approve the source, expected behavior, and assertions before a test can compile.</p></div></section>;
 
   if (!item.evaluation) {
     const ready = review.sourceTitle.trim() && review.sourceLocator.trim() && review.sourceExcerpt.trim() && review.expectedBehavior.trim() && review.forbidden.trim() && review.required.trim() && review.correctedResponse.trim();
@@ -313,21 +320,23 @@ function CIView({ item }: { item: RedressCase }) {
   return <div className="two-column ci-layout"><div className="content-stack"><div className="view-title compact"><div><span className="eyebrow"><span /> PERMANENT PROTECTION</span><h2>Ship the test with the fix.</h2><p>The portable runner returns a non-zero exit code when this failure returns.</p></div></div><section className="card install-steps"><h3>Run anywhere Node.js runs</h3><ol><li><span>1</span><div><strong>Download the evaluation</strong><p>No original artifacts, names, or secrets are included.</p></div></li><li><span>2</span><div><strong>Add the workflow</strong><p>Commit the generated GitHub Actions file.</p></div></li><li><span>3</span><div><strong>Protect your release</strong><p>A failed assertion blocks CI and writes a JSON result.</p></div></li></ol><a className="button dark wide" href={`/api/cases/${item.id}/export`} download><Icon name="download" size={17} />Download evaluation JSON</a><a className="button receipt-button wide" href={`/api/cases/${item.id}/receipt`} download><Icon name="shield" size={17} />Download Redress Receipt</a></section><div className="principle"><Icon name="shield" /><p><strong>Vendor-neutral by design.</strong><br />The case format can target an HTTP endpoint, recorded response, or local adapter.</p></div></div><section className="card code-panel workflow"><div className="code-head"><strong>.github/workflows/redressci.yml</strong><button onClick={copy}>{copied ? "Copied ✓" : "Copy"}</button></div><pre>{workflow}</pre></section></div>;
 }
 
-function ReportPage({ onCancel, onCreated }: { onCancel: () => void; onCreated: (item: RedressCase) => void }) {
+function ReportPage({ onCancel, onCreated, role, aiConfigured }: { onCancel: () => void; onCreated: (item: RedressCase) => void; role: WorkspaceRole; aiConfigured: boolean }) {
   const [step, setStep] = useState(1);
   const [busy, setBusy] = useState(false);
   const [artifact, setArtifact] = useState<File | null>(null);
   const [acknowledged, setAcknowledged] = useState(false);
   const [error, setError] = useState("");
-  const [form, setForm] = useState({ reporterName: "", product: "", originalTranscript: "", description: "", expectedBehavior: "", consent: "Private to reporter" });
+  const internal = role === "developer";
+  const [form, setForm] = useState({ reporterName: "", product: "", originalTranscript: "", description: "", expectedBehavior: "", consent: internal ? "Private workspace incident" : "Private to reporter" });
   const set = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
-  const canContinue = step === 1 ? Boolean(form.product.trim() && (form.originalTranscript.trim() || artifact)) : step === 2 ? Boolean(form.description.trim()) : acknowledged;
+  const artifactCanSupplyTranscript = artifact?.type === "text/plain" || Boolean(artifact?.type.startsWith("image/") && aiConfigured);
+  const canContinue = step === 1 ? Boolean(form.product.trim() && (form.originalTranscript.trim() || artifactCanSupplyTranscript)) : step === 2 ? Boolean(form.description.trim()) : acknowledged;
   const chooseArtifact = (file: File | null) => { setError(""); if (file && file.size > 8 * 1024 * 1024) { setArtifact(null); setError("The attachment is larger than 8 MB. Choose a smaller file."); return; } setArtifact(file); };
-  const submit = async () => { setBusy(true); setError(""); try { const { case: item } = await api.createCase({ ...form, title: form.description.slice(0, 70) || "Reported AI failure" }); if (artifact) { await api.uploadArtifact(item.id, artifact); if (artifact.type.startsWith("image/")) { const imageDataUrl = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = reject; reader.readAsDataURL(artifact); }); await api.extract(item.id, { transcript: form.originalTranscript, imageDataUrl }); } } await api.redact(item.id, form.originalTranscript, false); onCreated((await api.case(item.id)).case); } catch (reason) { setError(reason instanceof Error ? reason.message : "The report could not be submitted. Please try again."); } finally { setBusy(false); } };
-  return <div className="report-page"><header><Logo /><button className="icon-button" onClick={onCancel} aria-label="Close"><Icon name="close" /></button></header><div className="report-shell"><aside><span className="eyebrow"><span /> REPORT AN AI FAILURE</span><h1>Your experience can protect the next person.</h1><p>You don’t need to know how software testing works. Tell us what happened; we’ll help structure it safely.</p><div className="steps">{["What happened", "Impact & expectation", "Privacy & consent"].map((label, index) => <div className={step >= index + 1 ? "active" : ""} key={label}><span>{step > index + 1 ? <Icon name="check" size={14} /> : index + 1}</span><strong>{label}</strong></div>)}</div><div className="privacy-promise"><Icon name="lock" /><p><strong>Private until you approve.</strong><br />Original evidence is separated from the anonymized case.</p></div></aside><section className="report-form card">
-    {step === 1 && <><span className="step-label">STEP 1 OF 3</span><h2>What happened?</h2><p>Paste the interaction exactly as you saw it. You can edit extracted text before it is used.</p><label>Your name or alias <small>Optional · removed from shared tests</small><input value={form.reporterName} onChange={(e) => set("reporterName", e.target.value)} placeholder="e.g. Maya Chen" /></label><label>AI product or system <small>Required</small><input value={form.product} onChange={(e) => set("product", e.target.value)} placeholder="e.g. City services chatbot" required /></label><label>Conversation transcript <small>Required unless attaching evidence</small><textarea rows={7} value={form.originalTranscript} onChange={(e) => set("originalTranscript", e.target.value)} placeholder={'You: What did you ask?\nAI: What did it answer?'} /></label><label className="upload-drop"><Icon name="upload" /><div><strong>{artifact ? artifact.name : "Or attach a screenshot"}</strong><small>{artifact ? `${Math.ceil(artifact.size / 1024)} KB · stored privately` : "PNG, JPG, WebP, PDF, or text · 8 MB max"}</small></div><span>{artifact ? "Replace" : "Choose file"}</span><input className="file-input" type="file" accept="image/png,image/jpeg,image/webp,application/pdf,text/plain" onChange={(event) => chooseArtifact(event.target.files?.[0] || null)} /></label></>}
+  const submit = async () => { setBusy(true); setError(""); try { const { case: item } = await api.createCase({ ...form, intakeType: internal ? "internal-incident" : "affected-person", title: form.description.slice(0, 70) || (internal ? "Internal AI incident" : "Reported AI failure") }); if (artifact) { const uploaded = await api.uploadArtifact(item.id, artifact) as { artifact: { id: string } }; if (artifact.type === "text/plain" || artifact.type.startsWith("image/")) await api.extract(item.id, { transcript: form.originalTranscript, artifactId: uploaded.artifact.id }); } await api.redact(item.id, form.originalTranscript, false); onCreated((await api.case(item.id)).case); } catch (reason) { setError(reason instanceof Error ? reason.message : "The report could not be submitted. Please try again."); } finally { setBusy(false); } };
+  return <div className="report-page"><header><Logo /><button className="icon-button" onClick={onCancel} aria-label="Close"><Icon name="close" /></button></header><div className="report-shell"><aside><span className="eyebrow"><span /> {internal ? "REPORT AN INTERNAL INCIDENT" : "REPORT AN AI FAILURE"}</span><h1>{internal ? "Turn a discovered failure into a durable test." : "Your experience can protect the next person."}</h1><p>{internal ? "Record a QA, production, or monitoring failure without entering another person’s private report." : "You don’t need to know how software testing works. Tell us what happened; we’ll help structure it safely."}</p><div className="steps">{["What happened", "Impact & expectation", internal ? "Privacy acknowledgment" : "Privacy & consent"].map((label, index) => <div className={step >= index + 1 ? "active" : ""} key={label}><span>{step > index + 1 ? <Icon name="check" size={14} /> : index + 1}</span><strong>{label}</strong></div>)}</div><div className="privacy-promise"><Icon name="lock" /><p><strong>Private until approved.</strong><br />Original evidence is separated from the anonymized case.</p></div></aside><section className="report-form card">
+    {step === 1 && <><span className="step-label">STEP 1 OF 3</span><h2>What happened?</h2><p>Paste the interaction exactly as observed. Text files are parsed locally; screenshots use live AI when configured.</p>{!internal && <label>Your name or alias <small>Optional · removed from shared tests</small><input value={form.reporterName} onChange={(e) => set("reporterName", e.target.value)} placeholder="e.g. Maya Chen" /></label>}<label>AI product or system <small>Required</small><input value={form.product} onChange={(e) => set("product", e.target.value)} placeholder="e.g. City services chatbot" required /></label><label>Conversation transcript <small>Required unless using text or extractable image evidence</small><textarea rows={7} value={form.originalTranscript} onChange={(e) => set("originalTranscript", e.target.value)} placeholder={'You: What did you ask?\nAI: What did it answer?'} /></label><label className="upload-drop"><Icon name="upload" /><div><strong>{artifact ? artifact.name : "Attach private evidence"}</strong><small>{artifact ? `${Math.ceil(artifact.size / 1024)} KB · encrypted at rest` : "PNG, JPG, WebP, PDF, or text · 8 MB max"}</small></div><span>{artifact ? "Replace" : "Choose file"}</span><input className="file-input" type="file" accept="image/png,image/jpeg,image/webp,application/pdf,text/plain" onChange={(event) => chooseArtifact(event.target.files?.[0] || null)} /></label>{artifact?.type === "application/pdf" && !form.originalTranscript.trim() && <div className="field-guidance">PDF is stored as supporting evidence; paste the conversation transcript above.</div>}{artifact?.type.startsWith("image/") && !aiConfigured && !form.originalTranscript.trim() && <div className="field-guidance">Screenshot extraction is unavailable until live AI is configured; paste the transcript above.</div>}</>}
     {step === 2 && <><span className="step-label">STEP 2 OF 3</span><h2>Why did this response fail?</h2><p>Describe the effect in your own words. A reviewer will link any external claims to evidence.</p><label>What went wrong?<textarea rows={5} value={form.description} onChange={(e) => set("description", e.target.value)} placeholder="What was inaccurate, inaccessible, unsafe, or misleading?" /></label><label>What should have happened? <small>Optional</small><textarea rows={5} value={form.expectedBehavior} onChange={(e) => set("expectedBehavior", e.target.value)} placeholder="Describe the outcome you expected." /></label><div className="tip"><Icon name="sparkle" /><p>GPT-5.6 can propose a structured incident and surface unanswered questions, but a human reviewer approves the expected behavior.</p></div></>}
-    {step === 3 && <><span className="step-label">STEP 3 OF 3</span><h2>Choose how this can be shared.</h2><p>Your original submission always stays separate from the anonymized evaluation.</p><div className="consent-options">{["Private to reporter", "Shared with responsible organization", "Anonymized research use", "Anonymized public evaluation use"].map((option) => <label className={form.consent === option ? "selected" : ""} key={option}><input type="radio" name="consent" checked={form.consent === option} onChange={() => set("consent", option)} /><span><strong>{option}</strong><small>{option === "Private to reporter" ? "Only you and assigned reviewers can access it." : "Personal details are removed and a reviewer must approve sharing."}</small></span></label>)}</div><label className="approval-check"><input type="checkbox" checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)} /><span>I understand this report starts private and that I can withdraw consent before public publication.</span></label></>}
+    {step === 3 && <><span className="step-label">STEP 3 OF 3</span><h2>{internal ? "Confirm the privacy boundary." : "Choose how this can be shared."}</h2><p>{internal ? "This internal incident stays in the workspace and does not grant access to community reporters’ original evidence." : "Your original submission always stays separate from the anonymized evaluation."}</p>{!internal && <div className="consent-options">{["Private to reporter", "Shared with responsible organization", "Anonymized research use", "Anonymized public evaluation use"].map((option) => <label className={form.consent === option ? "selected" : ""} key={option}><input type="radio" name="consent" checked={form.consent === option} onChange={() => set("consent", option)} /><span><strong>{option}</strong><small>{option === "Private to reporter" ? "Only you and assigned reviewers can access it." : "Personal details are removed and a reviewer must approve sharing."}</small></span></label>)}</div>}<label className="approval-check"><input type="checkbox" checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)} /><span>{internal ? "I confirm this report contains only evidence I am authorized to submit and will complete privacy review before wider use." : "I understand this report starts private and that I can withdraw consent before public publication."}</span></label></>}
     {error && <div className="form-error"><Icon name="alert" size={16} />{error}</div>}
     <footer><button className="button quiet" onClick={step === 1 ? onCancel : () => { setError(""); setStep(step - 1); }}>{step === 1 ? "Cancel" : "Back"}</button><button className="button dark" disabled={busy || !canContinue} onClick={step === 3 ? submit : () => { setError(""); setStep(step + 1); }}>{busy ? "Creating private case…" : step === 3 ? "Submit private report" : "Continue"}<Icon name="arrow" size={16} /></button></footer>
   </section></div></div>;
@@ -387,10 +396,10 @@ export default function App() {
   const refreshPlatform = async () => setPlatform((await api.platform()).platform);
   const reset = async () => { const { case: item } = await api.reset(); setCases([item]); setSelected(null); await refreshPlatform(); navigate({ page: "dashboard" }); };
   if (loading) return <div className="loading-screen"><Logo /><span /></div>;
-  if (page === "report") return <ReportPage onCancel={() => navigate({ page: "dashboard" })} onCreated={(item) => { setCases((current) => [item, ...current]); setSelected(item); navigate({ page: "case", caseId: item.id }); }} />;
+  if (page === "report") return <ReportPage role={role} aiConfigured={ai} onCancel={() => navigate({ page: "dashboard" })} onCreated={(item) => { setCases((current) => [item, ...current]); setSelected(item); navigate({ page: "case", caseId: item.id }); }} />;
   return <Shell page={page} onNavigate={navigatePage} onReport={() => navigate({ page: "report" })} ai={ai} role={role} roleBusy={roleBusy} onRoleChange={switchRole}>
-    {page === "dashboard" && <Dashboard cases={cases} onOpen={openCase} onReport={() => navigate({ page: "report" })} onReset={reset} canReport={role === "reporter" || role === "admin"} canReset={role === "admin"} />}
+    {page === "dashboard" && <Dashboard cases={cases} onOpen={openCase} onReport={() => navigate({ page: "report" })} onReset={reset} canReport={role === "reporter" || role === "developer" || role === "admin"} canReset={role === "admin"} />}
     {page === "assurance" && <AssurancePage platform={platform} cases={cases} refresh={refreshPlatform} />}
-    {page === "case" && selected && <CaseDetail item={selected} onBack={() => navigate({ page: "dashboard" })} refresh={refreshSelected} />}
+    {page === "case" && selected && <CaseDetail item={selected} onBack={() => navigate({ page: "dashboard" })} refresh={refreshSelected} role={role} />}
   </Shell>;
 }
