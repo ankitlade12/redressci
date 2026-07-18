@@ -118,7 +118,7 @@ Private attachments are read from encrypted server-side storage. Plain-text file
 - GPT-5.6 evidence-source discovery over privacy-approved case text; every result remains a proposed candidate until human review.
 - A downloadable deployed-target GitHub Actions check and optional GitHub Checks API publishing.
 - A privacy-safe recurring-failure radar with minimum-group suppression.
-- Browser-provided voice input for the interaction and impact fields, with editable text before submission.
+- Permission-aware browser voice input for the interaction and impact fields, with editable text, actionable fallbacks, and no stored audio.
 
 ### Design-partner foundation
 

@@ -21,6 +21,10 @@ Use the **Reporter** role and enter synthetic data such as:
 
 The case starts private. Text attachments can supply the transcript. A screenshot can supply it only when live AI is configured. PDF files are retained as supporting evidence and require a pasted transcript.
 
+### Dictation
+
+Select **Dictate interaction** or **Dictate impact**, allow microphone access, and speak after the listening indicator appears. RedressCI adds only the recognized text to the editable field and does not store the audio. Dictation requires HTTPS and a browser with the Web Speech API, such as a current Chrome, Edge, or Safari release. If permission is blocked, restore microphone access in the browser's site settings and try again; typing and private attachments remain available.
+
 ## Developer example
 
 Switch to **Developer**, select **Report internal incident**, and enter:

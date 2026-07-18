@@ -3,6 +3,7 @@ import { api } from "./api";
 import { Icon } from "./icons";
 import type { EvidenceSuggestion, RedressCase } from "./types";
 import type { GitHubCheckBundle, PlatformDashboard, ReporterStatusView, WorkspaceRole } from "./platform-types";
+import { appendSpeechTranscript, microphoneErrorMessage, speechRecognitionErrorMessage } from "./voice-input";
 
 type SpeechRecognitionLike = {
   continuous: boolean;
@@ -10,37 +11,92 @@ type SpeechRecognitionLike = {
   lang: string;
   start: () => void;
   stop: () => void;
-  onresult: ((event: { results: ArrayLike<{ 0: { transcript: string }; isFinal: boolean }> }) => void) | null;
+  onresult: ((event: { resultIndex?: number; results: ArrayLike<{ 0?: { transcript?: string }; isFinal: boolean }> }) => void) | null;
   onerror: ((event: { error: string }) => void) | null;
   onend: (() => void) | null;
 };
 
 export function VoiceInputButton({ value, onChange, label = "Dictate" }: { value: string; onChange: (value: string) => void; label?: string }) {
   const [listening, setListening] = useState(false);
+  const [requesting, setRequesting] = useState(false);
   const [message, setMessage] = useState("");
   const recognition = useRef<SpeechRecognitionLike | null>(null);
-  const supported = typeof window !== "undefined" && Boolean((window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike; webkitSpeechRecognition?: new () => SpeechRecognitionLike }).SpeechRecognition || (window as unknown as { webkitSpeechRecognition?: new () => SpeechRecognitionLike }).webkitSpeechRecognition);
-  const toggle = () => {
-    if (listening) { recognition.current?.stop(); return; }
+  const valueRef = useRef(value);
+  const onChangeRef = useRef(onChange);
+  useEffect(() => { valueRef.current = value; }, [value]);
+  useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
+  useEffect(() => () => {
+    const active = recognition.current;
+    if (active) {
+      active.onresult = null;
+      active.onerror = null;
+      active.onend = null;
+      active.stop();
+    }
+  }, []);
+  const browser = typeof window === "undefined" ? null : window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike; webkitSpeechRecognition?: new () => SpeechRecognitionLike; isSecureContext?: boolean };
+  const supported = Boolean(browser && (browser.SpeechRecognition || browser.webkitSpeechRecognition));
+  const secure = Boolean(browser?.isSecureContext);
+  const toggle = async () => {
+    if (listening) { setMessage("Stopping voice input…"); recognition.current?.stop(); return; }
+    if (requesting) return;
+    if (!secure) { setMessage("Voice input requires a secure HTTPS connection. Type the interaction instead on this page."); return; }
     const browser = window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike; webkitSpeechRecognition?: new () => SpeechRecognitionLike };
     const Constructor = browser.SpeechRecognition || browser.webkitSpeechRecognition;
     if (!Constructor) { setMessage("Voice input is not available in this browser."); return; }
-    const instance = new Constructor();
-    instance.continuous = true;
-    instance.interimResults = false;
-    instance.lang = document.documentElement.lang || navigator.language || "en-US";
-    instance.onresult = (event) => {
-      const transcript = Array.from(event.results).filter((result) => result.isFinal).map((result) => result[0].transcript.trim()).filter(Boolean).join(" ");
-      if (transcript) onChange(`${value}${value.trim() ? "\n" : ""}${transcript}`);
-    };
-    instance.onerror = (event) => { setMessage(`Voice input stopped: ${event.error}.`); setListening(false); };
-    instance.onend = () => { setListening(false); setMessage("Voice input stopped. Review the text before continuing."); };
-    recognition.current = instance;
-    setMessage("Listening. Speak naturally; you can edit the transcript before submission.");
-    setListening(true);
-    instance.start();
+    setRequesting(true);
+    setMessage("Requesting microphone access…");
+    try {
+      if (navigator.mediaDevices?.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach((track) => track.stop());
+      }
+      const instance = new Constructor();
+      let failed = false;
+      let receivedText = false;
+      // One utterance is substantially more reliable across Chrome, Edge, and Safari.
+      instance.continuous = false;
+      instance.interimResults = false;
+      instance.lang = document.documentElement.lang || navigator.language || "en-US";
+      instance.onresult = (event) => {
+        const start = event.resultIndex ?? 0;
+        const parts: string[] = [];
+        for (let index = start; index < event.results.length; index += 1) {
+          const result = event.results[index];
+          const transcript = result?.isFinal ? result[0]?.transcript?.trim() : "";
+          if (transcript) parts.push(transcript);
+        }
+        if (parts.length) {
+          const next = appendSpeechTranscript(valueRef.current, parts.join(" "));
+          valueRef.current = next;
+          onChangeRef.current(next);
+          receivedText = true;
+        }
+      };
+      instance.onerror = (event) => {
+        failed = true;
+        setMessage(speechRecognitionErrorMessage(event.error));
+        setListening(false);
+      };
+      instance.onend = () => {
+        if (recognition.current === instance) recognition.current = null;
+        setListening(false);
+        if (!failed) setMessage(receivedText ? "Voice text added. Review and edit it before continuing." : "Voice input stopped. No text was added; try again or type instead.");
+      };
+      recognition.current = instance;
+      instance.start();
+      setListening(true);
+      setMessage("Listening. Speak now; recording stops after this utterance.");
+    } catch (error) {
+      recognition.current = null;
+      setListening(false);
+      setMessage(microphoneErrorMessage(error));
+    } finally {
+      setRequesting(false);
+    }
   };
-  return <div className="voice-control"><button type="button" className={`button voice-button ${listening ? "recording" : ""}`} onClick={toggle} aria-pressed={listening} disabled={!supported}><span className="voice-dot" />{listening ? "Stop listening" : label}</button><small aria-live="polite">{supported ? message || "Your browser handles speech recognition; RedressCI keeps only the editable text you submit." : "Voice input is unavailable here; typing and private attachments still work."}</small></div>;
+  const unavailable = !supported ? "Voice input is unavailable in this browser; use current Chrome, Edge, or Safari, or type instead." : !secure ? "Voice input requires HTTPS; typing and private attachments still work." : "";
+  return <div className="voice-control"><button type="button" className={`button voice-button ${listening ? "recording" : ""}`} onClick={toggle} aria-pressed={listening} disabled={!supported || !secure || requesting}><span className="voice-dot" />{requesting ? "Opening microphone…" : listening ? "Stop listening" : label}</button><small aria-live="polite">{unavailable || message || "Your browser handles speech recognition; RedressCI keeps only the editable text you submit."}</small></div>;
 }
 
 export function EvidenceDiscoveryPanel({ item, onUse }: { item: RedressCase; onUse: (suggestion: EvidenceSuggestion) => void }) {
