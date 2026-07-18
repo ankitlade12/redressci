@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "./api";
 import { Icon } from "./icons";
+import { parseRoute, routePath, type AppRoute, type Page } from "./routing";
 import type { AssertionResult, EvaluationRun, RedressCase, ResultState } from "./types";
 import type { PlatformDashboard } from "./platform-types";
 
-type Page = "dashboard" | "case" | "report" | "assurance";
 type CaseTab = "overview" | "evidence" | "evaluation" | "validation" | "timeline" | "ci";
 
 const formatDate = (date: string, withTime = false) => new Intl.DateTimeFormat("en", { month: "short", day: "numeric", ...(withTime ? { hour: "numeric", minute: "2-digit" } : {}) }).format(new Date(date));
@@ -14,14 +14,14 @@ function StatusPill({ state, children }: { state: ResultState | "verified" | "lo
   return <span className={`pill pill-${state}`}>{state === "pass" || state === "verified" ? <Icon name="check" size={13} /> : null}{children || titleCase(state)}</span>;
 }
 
-function Logo() {
-  return <button className="logo" onClick={() => location.reload()} aria-label="Go to dashboard"><span className="logo-mark"><Icon name="mark" size={21} /></span><span>Redress<span>CI</span></span></button>;
+function Logo({ onDashboard }: { onDashboard?: () => void }) {
+  return <button className="logo" onClick={onDashboard || (() => location.assign("/"))} aria-label="Go to dashboard"><span className="logo-mark"><Icon name="mark" size={21} /></span><span>Redress<span>CI</span></span></button>;
 }
 
 function Shell({ children, page, onNavigate, onReport, ai }: { children: React.ReactNode; page: Page; onNavigate: (page: Page) => void; onReport: () => void; ai: boolean }) {
   return <div className="app-shell">
     <aside className="sidebar">
-      <Logo />
+      <Logo onDashboard={() => onNavigate("dashboard")} />
       <nav aria-label="Main navigation">
         <button className={page === "dashboard" ? "active" : ""} onClick={() => onNavigate("dashboard")}><Icon name="grid" />Cases</button>
         <button className={page === "assurance" ? "active" : ""} onClick={() => onNavigate("assurance")}><Icon name="shield" />Assurance network</button>
@@ -310,23 +310,49 @@ function ReportPage({ onCancel, onCreated }: { onCancel: () => void; onCreated: 
 function EmptyState({ title }: { title: string }) { return <div className="empty-state"><Icon name="flask" size={30} /><h3>{title}</h3><p>Complete the previous review step to continue.</p></div>; }
 
 export default function App() {
-  const [page, setPage] = useState<Page>("dashboard");
+  const [route, setRoute] = useState<AppRoute>(() => parseRoute(window.location.pathname));
   const [cases, setCases] = useState<RedressCase[]>([]);
   const [selected, setSelected] = useState<RedressCase | null>(null);
   const [ai, setAi] = useState(false);
   const [platform, setPlatform] = useState<PlatformDashboard | null>(null);
   const [loading, setLoading] = useState(true);
-  const load = async () => { const [{ cases }, health, { platform }] = await Promise.all([api.cases(), api.health(), api.platform()]); setCases(cases); setAi(health.ai.configured); setPlatform(platform); setLoading(false); };
+  const page = route.page;
+  const navigate = (next: AppRoute, replace = false) => {
+    const path = routePath(next);
+    if (path !== window.location.pathname) window.history[replace ? "replaceState" : "pushState"]({ redressci: true }, "", path);
+    setRoute(next);
+    window.scrollTo(0, 0);
+  };
+  const navigatePage = (nextPage: Page) => navigate({ page: nextPage });
+  const load = async () => {
+    const [{ cases: loadedCases }, health, { platform }] = await Promise.all([api.cases(), api.health(), api.platform()]);
+    setCases(loadedCases); setAi(health.ai.configured); setPlatform(platform);
+    if (route.page === "case" && route.caseId) {
+      const matchingCase = loadedCases.find((item) => item.id === route.caseId);
+      setSelected(matchingCase || (await api.case(route.caseId)).case);
+    }
+    setLoading(false);
+  };
   useEffect(() => { load().catch(() => setLoading(false)); }, []);
-  const openCase = async (id: string) => { setSelected((await api.case(id)).case); setPage("case"); window.scrollTo(0, 0); };
+  useEffect(() => {
+    window.history.replaceState({ redressci: true }, "", routePath(parseRoute(window.location.pathname)));
+    const restoreRoute = () => setRoute(parseRoute(window.location.pathname));
+    window.addEventListener("popstate", restoreRoute);
+    return () => window.removeEventListener("popstate", restoreRoute);
+  }, []);
+  useEffect(() => {
+    if (loading || route.page !== "case" || !route.caseId || selected?.id === route.caseId) return;
+    api.case(route.caseId).then(({ case: item }) => setSelected(item)).catch(() => navigate({ page: "dashboard" }, true));
+  }, [loading, route.page, route.caseId, selected?.id]);
+  const openCase = async (id: string) => { setSelected((await api.case(id)).case); navigate({ page: "case", caseId: id }); };
   const refreshSelected = async () => { if (selected) { const fresh = (await api.case(selected.id)).case; setSelected(fresh); setCases((current) => current.map((item) => item.id === fresh.id ? fresh : item)); } };
   const refreshPlatform = async () => setPlatform((await api.platform()).platform);
-  const reset = async () => { const { case: item } = await api.reset(); setCases([item]); setSelected(null); await refreshPlatform(); setPage("dashboard"); };
+  const reset = async () => { const { case: item } = await api.reset(); setCases([item]); setSelected(null); await refreshPlatform(); navigate({ page: "dashboard" }); };
   if (loading) return <div className="loading-screen"><Logo /><span /></div>;
-  if (page === "report") return <ReportPage onCancel={() => setPage("dashboard")} onCreated={(item) => { setCases((current) => [item, ...current]); setSelected(item); setPage("case"); }} />;
-  return <Shell page={page} onNavigate={setPage} onReport={() => setPage("report")} ai={ai}>
-    {page === "dashboard" && <Dashboard cases={cases} onOpen={openCase} onReport={() => setPage("report")} onReset={reset} />}
+  if (page === "report") return <ReportPage onCancel={() => navigate({ page: "dashboard" })} onCreated={(item) => { setCases((current) => [item, ...current]); setSelected(item); navigate({ page: "case", caseId: item.id }); }} />;
+  return <Shell page={page} onNavigate={navigatePage} onReport={() => navigate({ page: "report" })} ai={ai}>
+    {page === "dashboard" && <Dashboard cases={cases} onOpen={openCase} onReport={() => navigate({ page: "report" })} onReset={reset} />}
     {page === "assurance" && <AssurancePage platform={platform} cases={cases} refresh={refreshPlatform} />}
-    {page === "case" && selected && <CaseDetail item={selected} onBack={() => setPage("dashboard")} refresh={refreshSelected} />}
+    {page === "case" && selected && <CaseDetail item={selected} onBack={() => navigate({ page: "dashboard" })} refresh={refreshSelected} />}
   </Shell>;
 }
