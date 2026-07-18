@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "Turn real AI failures into tests that stay fixed.",
+  "packageManager": "npm@10.9.8",
   "scripts": {
     "dev": "concurrently -k -n api,web -c cyan,green \"node --watch --import tsx server/index.ts\" \"vite\"",
     "build": "tsc --noEmit && vite build",
