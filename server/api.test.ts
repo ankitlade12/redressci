@@ -91,7 +91,7 @@ test("judge API path exposes demo, executes gate, and issues a receipt", async (
     body: JSON.stringify({ artifactId: uploaded.artifact.id }),
   });
   const extracted = await extractionResponse.json() as { extraction: { userInput: string; observedResponse: string }; ai: boolean; error?: string };
-  assert.equal(extractionResponse.status, 200, extracted.error);
+  assert.equal(extractionResponse.status, 200, extracted.error || "Artifact extraction should succeed");
   assert.equal(extracted.ai, false);
   assert.equal(extracted.extraction.userInput, "Why was my refund denied?");
   assert.match(extracted.extraction.observedResponse, /window expired/);
