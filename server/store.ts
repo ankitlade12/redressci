@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { RedressCase } from "../src/types.js";
+import { caseTitleFromDescription } from "../src/case-state.js";
 import { runEvaluation } from "./evaluation.js";
 import { createDemoCase } from "./fixtures.js";
 
@@ -32,22 +33,31 @@ export function resetStore() {
 
 if (persistenceFile && existsSync(persistenceFile)) {
   const saved = JSON.parse(readFileSync(persistenceFile, "utf8")) as RedressCase[];
-  for (const item of saved) cases.set(item.id, {
-    ...item,
-    status: item.status === "Verified fixed" ? "Evaluation verified" : item.status,
-    intakeType: item.intakeType || "affected-person",
-    artifacts: item.artifacts || [],
-    redactedTitle: item.redactedTitle || item.title,
-    redactedDescription: item.redactedDescription || item.description,
-    redactedUserInput: item.redactedUserInput || item.userInput,
-    redactedObservedResponse: item.redactedObservedResponse || item.observedResponse,
-    timeline: item.timeline.map((event) => event.label === "Fix independently verified" ? {
-      ...event,
-      label: "Recorded correction verified",
-      detail: "The recorded broken response failed and the recorded corrected response passed this evaluation. No deployed system was called.",
-      actor: "RedressCI validation gate",
-    } : event),
-  });
+  for (const item of saved) {
+    const generatedTitle = item.title.length === 70 && item.description.startsWith(item.title)
+      ? caseTitleFromDescription(item.description)
+      : item.title;
+    const generatedRedactedTitle = item.redactedTitle?.length === 70 && item.redactedDescription?.startsWith(item.redactedTitle)
+      ? caseTitleFromDescription(item.redactedDescription)
+      : item.redactedTitle || generatedTitle;
+    cases.set(item.id, {
+      ...item,
+      title: generatedTitle,
+      redactedTitle: generatedRedactedTitle,
+      status: item.status === "Verified fixed" ? "Evaluation verified" : item.status,
+      intakeType: item.intakeType || "affected-person",
+      artifacts: item.artifacts || [],
+      redactedDescription: item.redactedDescription || item.description,
+      redactedUserInput: item.redactedUserInput || item.userInput,
+      redactedObservedResponse: item.redactedObservedResponse || item.observedResponse,
+      timeline: item.timeline.map((event) => event.label === "Fix independently verified" ? {
+        ...event,
+        label: "Recorded correction verified",
+        detail: "The recorded broken response failed and the recorded corrected response passed this evaluation. No deployed system was called.",
+        actor: "RedressCI validation gate",
+      } : event),
+    });
+  }
 } else resetStore();
 
 export function listCases() {

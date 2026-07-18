@@ -1,5 +1,17 @@
 import type { EvaluationRun, RedressCase } from "./types";
 
+export function caseTitleFromDescription(description: string, fallback = "Reported AI failure", maximum = 70) {
+  const normalized = description.replace(/\s+/g, " ").trim();
+  if (!normalized) return fallback;
+  if (normalized.length <= maximum) return normalized;
+
+  const available = Math.max(12, maximum - 1);
+  const prefix = normalized.slice(0, available + 1);
+  const boundary = prefix.lastIndexOf(" ");
+  const cut = boundary >= Math.floor(available * 0.6) ? boundary : available;
+  return `${normalized.slice(0, cut).trim().replace(/[,:;.-]+$/u, "")}…`;
+}
+
 export function isEvaluationVerified(item: RedressCase) {
   return item.status === "Evaluation verified" || item.status === "Verified fixed";
 }

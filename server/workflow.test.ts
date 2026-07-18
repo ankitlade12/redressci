@@ -20,16 +20,18 @@ test("a fresh report completes privacy, evidence, compilation, and comparative v
   const base = `http://127.0.0.1:${port}`;
   const post = (path: string, body: unknown, method = "POST") => fetch(`${base}${path}`, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 
+  const impact = "The assistant recommended Central Hall even though it has twelve entrance stairs and no ramp.";
   const created = await json(await post("/api/cases", {
-    title: "Assistant returned an inaccessible venue",
+    title: impact.slice(0, 70),
     reporterName: "Jordan Lee",
     product: "Synthetic guide",
-    description: "The response ignored an access requirement.",
+    description: impact,
     originalTranscript: "You: Find an accessible venue\nAI: Use Central Hall. Email jordan@example.com for details.",
     expectedBehavior: "Recommend the accessible venue supported by the reviewed record.",
-  })) as { case: { id: string; userInput: string; observedResponse: string } };
+  })) as { case: { id: string; title: string; userInput: string; observedResponse: string } };
   const id = created.case.id;
   assert.equal(created.case.userInput, "Find an accessible venue");
+  assert.equal(created.case.title, "The assistant recommended Central Hall even though it has twelve…");
   assert.match(created.case.observedResponse, /Central Hall/);
 
   const proposal = await json(await post(`/api/cases/${id}/redact`, { approve: false, transcript: "You: Find an accessible venue\nAI: Use Central Hall. Email jordan@example.com for details." })) as { redacted: string };

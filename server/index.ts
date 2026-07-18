@@ -48,7 +48,7 @@ import {
 import { readEncryptedArtifact, storeEncryptedArtifact } from "./secure-storage.js";
 import { createCase, getCase, listCases, parseTranscript, resetStore, saveCase } from "./store.js";
 import type { Assertion } from "../src/types.js";
-import { areReviewTextsEquivalent } from "../src/case-state.js";
+import { areReviewTextsEquivalent, caseTitleFromDescription } from "../src/case-state.js";
 import type { SignedProofBundle, WorkspaceRole } from "../src/platform-types.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -139,11 +139,13 @@ app.post("/api/cases", requireRole("reporter", "developer", "admin"), (request, 
   if (typeof request.body.originalTranscript === "string" && request.body.originalTranscript.length > 100_000) return response.status(413).json({ error: "The pasted transcript is too large. Attach it as a text file instead." });
   const internal = request.identity?.role === "developer" || (request.identity?.role === "admin" && request.body.intakeType === "internal-incident");
   const consentOptions = new Set(["Private to reporter", "Shared with responsible organization", "Anonymized research use", "Anonymized public evaluation use"]);
+  const suppliedTitle = text(request.body.title, 140);
+  const titleWasGeneratedByOlderClient = suppliedTitle.length === 70 && description.startsWith(suppliedTitle);
   const item = createCase({
     product,
     description,
     originalTranscript,
-    title: text(request.body.title, 140) || description.slice(0, 70),
+    title: suppliedTitle && !titleWasGeneratedByOlderClient ? suppliedTitle : caseTitleFromDescription(description, internal ? "Internal AI incident" : "Reported AI failure"),
     expectedBehavior: text(request.body.expectedBehavior, 5000),
     reporterId: request.identity?.id,
     intakeType: internal ? "internal-incident" : "affected-person",

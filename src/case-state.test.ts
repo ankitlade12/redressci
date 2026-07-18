@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { runEvaluation } from "../server/evaluation.js";
 import { createDemoCase } from "../server/fixtures.js";
 import { Overview, ValidationView } from "./App.js";
-import { areReviewTextsEquivalent, getCaseOverviewState } from "./case-state.js";
+import { areReviewTextsEquivalent, caseTitleFromDescription, getCaseOverviewState } from "./case-state.js";
 
 test("pending intake never claims privacy, evidence, or validation approval", () => {
   const item = createDemoCase();
@@ -71,6 +71,24 @@ test("pending Overview renders no premature approval or verification claims", ()
 test("review rules and corrected targets must be meaningfully distinct records", () => {
   assert.equal(areReviewTextsEquivalent("Recommend a step-free location.", " recommend a step-free location "), true);
   assert.equal(areReviewTextsEquivalent("Recommend a verified step-free location.", "River Library has verified step-free access."), false);
+});
+
+test("generated case titles truncate only at word boundaries", () => {
+  const description = "The assistant recommended Central Hall even though it has twelve entrance stairs and no ramp.";
+  const title = caseTitleFromDescription(description);
+
+  assert.equal(title, "The assistant recommended Central Hall even though it has twelve…");
+  assert.doesNotMatch(title, /\bentra…$/);
+  assert.equal(title.length <= 70, true);
+});
+
+test("Overview renders the reporter impact exactly once without generic padding", () => {
+  const item = createDemoCase();
+  item.description = "This could prevent a wheelchair user from reaching a cooling center during extreme heat.";
+
+  const html = renderToStaticMarkup(createElement(Overview, { item, setTab: () => undefined }));
+  assert.equal(html.match(/This could prevent a wheelchair user/g)?.length, 1);
+  assert.doesNotMatch(html, /This can prevent someone from reaching a safe public service/);
 });
 
 test("private recorded-response validation never claims publication or a deployed fix", () => {
