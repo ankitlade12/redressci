@@ -1,4 +1,5 @@
 import type { Assertion, Evidence, RedressCase, TargetPair } from "./types";
+import type { PlatformDashboard } from "./platform-types";
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(path, {
@@ -33,4 +34,8 @@ export const api = {
   approveExpectedBehavior: (id: string, body: { expectedBehavior: string; category: string; audience: string; severity: RedressCase["severity"]; reviewer?: string }) => request(`/api/cases/${id}/review-expected-behavior`, { method: "POST", body: JSON.stringify(body) }),
   saveAssertions: (id: string, assertions: Assertion[]) => request<{ assertions: Assertion[] }>(`/api/cases/${id}/assertions`, { method: "PUT", body: JSON.stringify({ assertions }) }),
   saveTargets: (id: string, targetPair: Omit<TargetPair, "approvedAt">) => request<{ targetPair: TargetPair }>(`/api/cases/${id}/targets`, { method: "PUT", body: JSON.stringify({ ...targetPair, reviewer: targetPair.approvedBy }) }),
+  platform: () => request<{ platform: PlatformDashboard }>("/api/platform"),
+  runAssurance: (id: string) => request<{ assurance: { mutation: NonNullable<PlatformDashboard["latest"]["mutation"]>; calibration: NonNullable<PlatformDashboard["latest"]["calibration"]>; stability: NonNullable<PlatformDashboard["latest"]["stability"]>; scopeGuard: NonNullable<PlatformDashboard["latest"]["scopeGuard"]> } }>(`/api/cases/${id}/assurance`, { method: "POST", body: "{}" }),
+  proposeCounterfactuals: (id: string) => request(`/api/cases/${id}/counterfactuals`, { method: "POST", body: "{}" }),
+  sealEscrow: (id: string) => request(`/api/cases/${id}/escrow`, { method: "POST", body: "{}" }),
 };

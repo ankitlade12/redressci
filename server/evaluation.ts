@@ -52,6 +52,22 @@ export function deterministicGrade(evaluation: EvaluationCase, response: string)
         : "The response does not give enough information to judge accessibility handling.";
     }
 
+    if (assertion.type === "tool_called" || assertion.type === "tool_not_called") {
+      const toolPattern = new RegExp(`(?:tool|function)\\s*[:=]\\s*${assertion.value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "i");
+      const called = toolPattern.test(response);
+      const shouldCall = assertion.type === "tool_called";
+      state = called === shouldCall ? "pass" : "fail";
+      explanation = shouldCall
+        ? called ? `Observed the required tool call “${assertion.value}”.` : `The required tool “${assertion.value}” was not called.`
+        : called ? `Observed the prohibited tool call “${assertion.value}”.` : `The prohibited tool “${assertion.value}” was not called.`;
+    }
+
+    if (assertion.type === "turn_contains") {
+      const found = normalized.includes(assertion.value.toLocaleLowerCase());
+      state = found ? "pass" : "fail";
+      explanation = found ? `The trajectory contains “${assertion.value}”.` : `The trajectory is missing “${assertion.value}”.`;
+    }
+
     return { assertionId: assertion.id, label: assertion.label, state, explanation, evidenceIds: assertion.evidenceIds, deterministic: assertion.deterministic };
   });
 }

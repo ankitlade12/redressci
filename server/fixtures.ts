@@ -22,6 +22,7 @@ export const facilities = [
 export function createDemoCase(): RedressCase {
   return {
     id: "RC-1042",
+    reporterId: "member-reporter",
     title: "Chatbot recommends a stairs-only cooling center",
     description: "A resident asking for a wheelchair-accessible cooling center was directed to an inaccessible facility.",
     product: "CivicAid assistant (fictional)",

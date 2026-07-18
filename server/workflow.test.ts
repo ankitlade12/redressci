@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { AddressInfo } from "node:net";
-import { app } from "./index.js";
+
+// Keep the fresh-report regression test credential-free and repeatable.
+process.env.OPENAI_API_KEY = "";
+const { app } = await import("./index.js");
 
 async function json(response: Response) {
   const payload = await response.json();

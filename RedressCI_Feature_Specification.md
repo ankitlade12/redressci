@@ -1098,20 +1098,20 @@ RedressCI should not position itself as a replacement for incident databases, ob
 
 The MVP is complete when:
 
-- [ ] The synthetic case can be submitted through the reporter interface.
-- [ ] Screenshot or transcript extraction works.
-- [ ] Redaction is displayed and approved.
-- [ ] The structured incident includes evidence and uncertainty.
-- [ ] The evaluation compiler produces a portable case file.
-- [ ] The known-broken target fails.
-- [ ] The corrected target passes.
-- [ ] The application enforces the comparative validation gate.
-- [ ] The remediation timeline updates to verified fixed.
-- [ ] The evaluation can be exported to a sample CI workflow.
+- [x] The synthetic case can be submitted through the reporter interface.
+- [x] Screenshot or transcript extraction works. (Deterministic transcript path tested; live GPT-5.6 image path requires an API key.)
+- [x] Redaction is displayed and approved.
+- [x] The structured incident includes evidence and uncertainty.
+- [x] The evaluation compiler produces a portable case file.
+- [x] The known-broken target fails.
+- [x] The corrected target passes.
+- [x] The application enforces the comparative validation gate.
+- [x] The remediation timeline updates to verified fixed.
+- [x] The evaluation can be exported to a sample CI workflow.
 - [ ] The hosted judge path works without private credentials.
-- [ ] The README explains setup, architecture, Codex collaboration, and GPT-5.6 usage.
-- [ ] Automated tests cover the critical workflow.
-- [ ] The public demonstration uses only synthetic data.
+- [x] The README explains setup, architecture, Codex collaboration, and GPT-5.6 usage.
+- [x] Automated tests cover the critical workflow.
+- [x] The public demonstration uses only synthetic data.
 - [ ] The demo video is under three minutes.
 
 ---
@@ -1123,4 +1123,3 @@ The MVP is complete when:
 - [MIT AI Incident Tracker](https://airisk.mit.edu/ai-incident-tracker)
 - [MLCommons AI Risk & Reliability](https://mlcommons.org/working-groups/ai-risk-reliability/ai-risk-reliability/)
 - [NIST Generative AI Profile](https://nvlpubs.nist.gov/nistpubs/ai/NIST.AI.600-1.pdf)
-

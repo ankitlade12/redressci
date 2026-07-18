@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "./api";
 import { Icon } from "./icons";
 import type { AssertionResult, EvaluationRun, RedressCase, ResultState } from "./types";
+import type { PlatformDashboard } from "./platform-types";
 
-type Page = "dashboard" | "case" | "report";
+type Page = "dashboard" | "case" | "report" | "assurance";
 type CaseTab = "overview" | "evidence" | "evaluation" | "validation" | "timeline" | "ci";
 
 const formatDate = (date: string, withTime = false) => new Intl.DateTimeFormat("en", { month: "short", day: "numeric", ...(withTime ? { hour: "numeric", minute: "2-digit" } : {}) }).format(new Date(date));
@@ -23,6 +24,7 @@ function Shell({ children, page, onNavigate, onReport, ai }: { children: React.R
       <Logo />
       <nav aria-label="Main navigation">
         <button className={page === "dashboard" ? "active" : ""} onClick={() => onNavigate("dashboard")}><Icon name="grid" />Cases</button>
+        <button className={page === "assurance" ? "active" : ""} onClick={() => onNavigate("assurance")}><Icon name="shield" />Assurance network</button>
         <button onClick={onReport}><Icon name="plus" />Report a failure</button>
       </nav>
       <div className="sidebar-spacer" />
@@ -67,6 +69,45 @@ function Dashboard({ cases, onOpen, onReport, onReset }: { cases: RedressCase[];
       </div>
     </section>
     <footer className="trust-note"><Icon name="shield" size={18} /><span><strong>Privacy by default.</strong> Original reports remain separate from anonymized evaluations.</span></footer>
+  </div>;
+}
+
+function AssurancePage({ platform, cases, refresh }: { platform: PlatformDashboard | null; cases: RedressCase[]; refresh: () => Promise<void> }) {
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState("");
+  const verified = cases.find((item) => item.evaluation?.status === "verified");
+  const run = async () => {
+    if (!verified) return;
+    setBusy(true); setNotice("");
+    try {
+      await api.runAssurance(verified.id);
+      await api.proposeCounterfactuals(verified.id);
+      await api.sealEscrow(verified.id);
+      await refresh();
+      setNotice("Assurance suite complete: mutations, calibration, repeat runs, scope guard, variations, and sealed escrow were recorded.");
+    } catch (error) { setNotice(error instanceof Error ? error.message : "Assurance run failed"); }
+    finally { setBusy(false); }
+  };
+  if (!platform) return <div className="loading-screen"><Logo /><span /></div>;
+  const percent = (value: number) => `${Math.round(value * 100)}%`;
+  return <div className="page assurance-page">
+    <header className="assurance-hero"><div><span className="eyebrow"><span /> PROOF-CARRYING REMEDIATION</span><h1>Assurance that compounds<br /><em>across every fix.</em></h1><p>The full roadmap is represented as one operating layer: governed evidence enters once, then powers calibration, community packs, delivery policy, and independent proof.</p></div><button className="button dark" onClick={run} disabled={busy || !verified}><Icon name="flask" />{busy ? "Running assurance suite…" : "Run full assurance suite"}</button></header>
+    {notice && <div className="assurance-notice"><Icon name="check" />{notice}</div>}
+    <section className="assurance-metrics">
+      <div><span>Evidence coverage</span><strong>{percent(platform.metrics.evidenceCoverage)}</strong><small>Version-pinned dependencies</small></div>
+      <div><span>Mutation detection</span><strong>{percent(platform.metrics.mutationDetection)}</strong><small>Approved failures caught</small></div>
+      <div><span>Reviewer agreement</span><strong>{percent(platform.metrics.reviewerAgreement)}</strong><small>Rule vs model decisions</small></div>
+      <div><span>Repeat stability</span><strong>{percent(platform.metrics.repeatRunStability)}</strong><small>95% interval recorded</small></div>
+    </section>
+    <div className="assurance-body">
+      <section><div className="section-heading"><div><h2>Product phases</h2><p>Each phase exposes executable controls, not a roadmap placeholder.</p></div><StatusPill state="verified">35 capabilities</StatusPill></div><div className="phase-grid">{platform.phases.map((phase, index) => <article className="phase-card" key={phase.id}><div><span>0{index + 1}</span><StatusPill state="verified">Operational</StatusPill></div><h3>{phase.name}</h3><p>{phase.summary}</p><footer><strong>{phase.capabilities}</strong> enforced capabilities</footer></article>)}</div></section>
+      <section className="assurance-columns">
+        <article className="card assurance-panel"><div className="card-top"><div><span className="card-kicker">ASSURANCE ENGINE</span><h3>Evaluation quality is measured</h3></div><Icon name="flask" /></div>{platform.latest.mutation ? <><div className="assurance-score"><strong>{percent(platform.latest.mutation.detectionRate)}</strong><span>mutation detection</span></div><ul>{platform.latest.mutation.results.map((result) => <li key={result.id}><Icon name={result.caught ? "check" : "alert"} size={15} /><span>{result.name}</span><b>{result.observed}</b></li>)}</ul></> : <p className="empty-copy">Run the suite to generate mutation sensitivity, disagreement, confidence, and neighboring-regression evidence.</p>}</article>
+        <article className="card assurance-panel"><div className="card-top"><div><span className="card-kicker">COMMUNITY GOVERNANCE</span><h3>{platform.packs[0]?.name || "Evaluation packs"}</h3></div><Icon name="evidence" /></div>{platform.packs.map((pack) => <div className="pack-row" key={pack.id}><div><strong>v{pack.version}</strong><span>{pack.locales.join(" · ")} · {pack.accessibility.wcagTarget}</span></div><StatusPill state="verified">{pack.status}</StatusPill><p>{pack.changelog[0]}</p></div>)}<div className="governance-meta"><span><b>{platform.metrics.openReviewTasks}</b> re-reviews</span><span><b>{platform.metrics.auditEvents}</b> chained events</span><span><b>{platform.latest.pattern.suppressedGroups}</b> private patterns</span></div></article>
+        <article className="card assurance-panel"><div className="card-top"><div><span className="card-kicker">DELIVERY NETWORK</span><h3>Fixes stay connected to releases</h3></div><Icon name="timeline" /></div><div className="integration-list">{platform.integrations.map((integration) => <div key={integration.id}><span className={integration.state === "configured" ? "integration-on" : ""} /><div><strong>{integration.label}</strong><small>{integration.kind} · {integration.state}</small></div></div>)}</div>{verified && <div className="proof-actions"><a className="button dark" href={`/api/cases/${verified.id}/proof`} download><Icon name="shield" size={16} />Signed proof bundle</a><a className="button" href={`/api/cases/${verified.id}/oecd`} target="_blank" rel="noreferrer"><Icon name="download" size={16} />OECD export</a></div>}</article>
+      </section>
+      <footer className="network-boundary"><Icon name="lock" /><p><strong>Privacy boundary remains active across the network.</strong> Pattern groups below {platform.latest.pattern.threshold} cases are suppressed, escrow payloads are encrypted, and proof bundles contain evidence hashes—not original artifacts.</p><code>{platform.auditHead.slice(0, 18)}…</code></footer>
+    </div>
   </div>;
 }
 
@@ -246,7 +287,7 @@ function TimelineView({ item }: { item: RedressCase }) {
 }
 
 function CIView({ item }: { item: RedressCase }) {
-  const workflow = `name: RedressCI regression pack\n\non:\n  pull_request:\n  push:\n    branches: [main]\n\njobs:\n  evaluate:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-node@v4\n        with:\n          node-version: 20\n      - run: npm ci\n      - run: npm run test:ci\n      - uses: actions/upload-artifact@v4\n        if: always()\n        with:\n          name: redressci-results\n          path: results/*.json`;
+  const workflow = `name: RedressCI regression pack\n\non:\n  pull_request:\n  push:\n    branches: [main]\n\njobs:\n  evaluate:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-node@v4\n        with:\n          node-version: 22\n      - run: npm ci\n      - run: npm run test:ci\n      - uses: actions/upload-artifact@v4\n        if: always()\n        with:\n          name: redressci-results\n          path: results/*.json`;
   const copy = () => navigator.clipboard.writeText(workflow);
   return <div className="two-column ci-layout"><div className="content-stack"><div className="view-title compact"><div><span className="eyebrow"><span /> PERMANENT PROTECTION</span><h2>Ship the test with the fix.</h2><p>The portable runner returns a non-zero exit code when this failure returns.</p></div></div><section className="card install-steps"><h3>Run anywhere Node.js runs</h3><ol><li><span>1</span><div><strong>Download the evaluation</strong><p>No original artifacts, names, or secrets are included.</p></div></li><li><span>2</span><div><strong>Add the workflow</strong><p>Commit the generated GitHub Actions file.</p></div></li><li><span>3</span><div><strong>Protect your release</strong><p>A failed assertion blocks CI and writes a JSON result.</p></div></li></ol><a className="button dark wide" href={`/api/cases/${item.id}/export`} download><Icon name="download" size={17} />Download evaluation JSON</a><a className="button receipt-button wide" href={`/api/cases/${item.id}/receipt`} download><Icon name="shield" size={17} />Download Redress Receipt</a></section><div className="principle"><Icon name="shield" /><p><strong>Vendor-neutral by design.</strong><br />The case format can target an HTTP endpoint, recorded response, or local adapter.</p></div></div><section className="card code-panel workflow"><div className="code-head"><strong>.github/workflows/redressci.yml</strong><button onClick={copy}>Copy</button></div><pre>{workflow}</pre></section></div>;
 }
@@ -273,16 +314,19 @@ export default function App() {
   const [cases, setCases] = useState<RedressCase[]>([]);
   const [selected, setSelected] = useState<RedressCase | null>(null);
   const [ai, setAi] = useState(false);
+  const [platform, setPlatform] = useState<PlatformDashboard | null>(null);
   const [loading, setLoading] = useState(true);
-  const load = async () => { const [{ cases }, health] = await Promise.all([api.cases(), api.health()]); setCases(cases); setAi(health.ai.configured); setLoading(false); };
+  const load = async () => { const [{ cases }, health, { platform }] = await Promise.all([api.cases(), api.health(), api.platform()]); setCases(cases); setAi(health.ai.configured); setPlatform(platform); setLoading(false); };
   useEffect(() => { load().catch(() => setLoading(false)); }, []);
   const openCase = async (id: string) => { setSelected((await api.case(id)).case); setPage("case"); window.scrollTo(0, 0); };
   const refreshSelected = async () => { if (selected) { const fresh = (await api.case(selected.id)).case; setSelected(fresh); setCases((current) => current.map((item) => item.id === fresh.id ? fresh : item)); } };
-  const reset = async () => { const { case: item } = await api.reset(); setCases([item]); setSelected(null); setPage("dashboard"); };
+  const refreshPlatform = async () => setPlatform((await api.platform()).platform);
+  const reset = async () => { const { case: item } = await api.reset(); setCases([item]); setSelected(null); await refreshPlatform(); setPage("dashboard"); };
   if (loading) return <div className="loading-screen"><Logo /><span /></div>;
   if (page === "report") return <ReportPage onCancel={() => setPage("dashboard")} onCreated={(item) => { setCases((current) => [item, ...current]); setSelected(item); setPage("case"); }} />;
   return <Shell page={page} onNavigate={setPage} onReport={() => setPage("report")} ai={ai}>
     {page === "dashboard" && <Dashboard cases={cases} onOpen={openCase} onReport={() => setPage("report")} onReset={reset} />}
+    {page === "assurance" && <AssurancePage platform={platform} cases={cases} refresh={refreshPlatform} />}
     {page === "case" && selected && <CaseDetail item={selected} onBack={() => setPage("dashboard")} refresh={refreshSelected} />}
   </Shell>;
 }

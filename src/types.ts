@@ -26,7 +26,7 @@ export interface Evidence {
 
 export interface Assertion {
   id: string;
-  type: "forbidden_entity" | "required_concept" | "evidence_citation_required" | "semantic_rubric";
+  type: "forbidden_entity" | "required_concept" | "evidence_citation_required" | "semantic_rubric" | "tool_called" | "tool_not_called" | "turn_contains";
   value: string;
   label: string;
   evidenceIds: string[];
@@ -42,6 +42,10 @@ export interface EvaluationCase {
   severity: "low" | "medium" | "high" | "critical";
   taxonomy: string[];
   input: { message: string };
+  trajectory?: {
+    turns: Array<{ role: "user" | "assistant" | "tool"; content: string; toolName?: string }>;
+    tools: Array<{ name: string; arguments?: Record<string, unknown>; required: boolean }>;
+  };
   context: Record<string, string>;
   evidence: Evidence[];
   assertions: Assertion[];
@@ -105,6 +109,7 @@ export interface CaseReview {
 
 export interface RedressCase {
   id: string;
+  reporterId?: string;
   title: string;
   description: string;
   product: string;

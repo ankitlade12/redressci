@@ -45,11 +45,11 @@
 
 ## 2:27–2:52 — Vision and differentiation
 
-**Screen:** Return to dashboard or show receipt download.
+**Screen:** Open Assurance network, then show the signed proof download.
 
 **Narration:**
 
-“Incident databases remember failures. Eval platforms score developer datasets. RedressCI connects the affected person to the engineering fix and verifies the full path. One person’s experience becomes protection for everyone who comes next.”
+“Incident databases remember failures. Eval platforms score developer datasets. RedressCI connects the affected person to the engineering fix, tests the test with mutations, and carries signed proof into releases and governed community packs. One person’s experience becomes protection for everyone who comes next.”
 
 ## Recording checklist
 
@@ -58,4 +58,5 @@
 - Do not include copyrighted music, real brands, or real personal information.
 - Show the validation button being selected and both results appearing.
 - Keep the final upload below three minutes; judges are not required to watch beyond it.
-
+- Run the Assurance network suite once before recording so its mutation and stability metrics are visible.
+- Download the signed proof bundle only after the comparative gate is verified.

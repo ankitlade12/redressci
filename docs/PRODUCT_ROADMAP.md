@@ -49,6 +49,8 @@ Establish Remediation CI as a new developer-tool category: every valid, consente
 
 ## Phase 1 — Design-partner pilot (0–8 weeks)
 
+**Engineering status:** ✅ executable foundation implemented. Managed infrastructure and real design-partner validation remain external milestones.
+
 **Objective:** validate the workflow with 2–3 organizations and one community partner.
 
 ### Build
@@ -79,6 +81,8 @@ Establish Remediation CI as a new developer-tool category: every valid, consente
 
 ## Phase 2 — Assurance engine (2–5 months)
 
+**Engineering status:** ✅ executable locally: mutation, calibration, stability/confidence, severity policy, scope guard, trajectories, signed proofs, evidence pins, and chained audit events.
+
 **Objective:** make evaluation quality itself measurable.
 
 ### Build
@@ -100,6 +104,8 @@ Establish Remediation CI as a new developer-tool category: every valid, consente
 - Grader/version changes automatically invalidate affected assurance claims.
 
 ## Phase 3 — Community evaluation packs (5–9 months)
+
+**Engineering status:** ✅ governed pack foundation implemented. Named external stewards, compensation payments, and three independently maintained packs require partner operations.
 
 **Objective:** turn individual cases into governed, reusable protection.
 
@@ -127,6 +133,8 @@ Establish Remediation CI as a new developer-tool category: every valid, consente
 - Community reviewers are compensated under a published policy.
 
 ## Phase 4 — Remediation network (9–18 months)
+
+**Engineering status:** ✅ network and policy foundation implemented, including the SDK and integration contracts. Real SSO, regional cloud resources, third-party app credentials, and independent verification partners require deployment accounts and agreements.
 
 **Objective:** become the neutral interoperability layer between reports and software delivery.
 
@@ -170,6 +178,11 @@ Establish Remediation CI as a new developer-tool category: every valid, consente
 3. ✅ Add the Redress Receipt as the signature novelty feature.
 4. ✅ Make human approval of privacy, evidence, expected behavior, assertions, and target pairs executable product gates.
 5. ✅ Document competitive positioning and the “Remediation CI” category.
-6. Next: replace the in-memory store with relational persistence and authenticated role boundaries.
-7. Next: deploy the judge build and record the three-minute narration centered on proof.
-8. Next: use pilot conversations to test evidence review and reporter closure—not demand for generic eval dashboards.
+6. ✅ Add durable state, PostgreSQL schema, authenticated role boundaries, encrypted artifact storage, jobs, adapters, and evidence invalidation.
+7. ✅ Implement the assurance, community-pack, and remediation-network foundations as executable product surfaces.
+8. Next: deploy the judge build and record the three-minute narration centered on proof.
+9. Next: use pilot conversations to validate evidence review, reporter closure, governance, and SLO assumptions with real participants.
+
+## Completion semantics
+
+“Implemented” means the capability has a typed domain object, server-side invariant, API or SDK surface, product visibility where appropriate, and automated coverage. It does not claim that external adoption targets have occurred. Success gates involving 30 cases, multiple organizations, compensated community members, cloud regions, or independent legal/regulatory determinations can only be completed through real operations.

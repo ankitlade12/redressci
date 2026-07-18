@@ -6,3 +6,7 @@ coverage/
 results/
 data/originals/*
 !data/originals/.gitkeep
+data/encrypted/*
+!data/encrypted/.gitkeep
+data/state/*
+!data/state/.gitkeep

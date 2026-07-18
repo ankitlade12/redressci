@@ -5,7 +5,7 @@
 RedressCI converts a reported AI failure into a privacy-safe, evidence-backed regression test, proves that it fails on the broken system and passes on the corrected one, and exports the test to CI so the same failure cannot silently return.
 
 **OpenAI Build Week track:** Developer Tools  
-**Status:** runnable hackathon MVP  
+**Status:** runnable all-phase product foundation
 **Demo data:** entirely fictional and synthetic
 
 ## Why this exists
@@ -23,7 +23,7 @@ The central invariant is enforced in application logic: a case cannot become ver
 
 ## Judge quickstart
 
-Requirements: Node.js 20+ and npm. Tested on macOS and designed to run on Linux and Windows.
+Requirements: Node.js 22+ and npm. Tested on macOS and designed to run on Linux and Windows.
 
 ```bash
 npm install
@@ -102,8 +102,29 @@ AI output never approves privacy, consent, evidence, expected behavior, or verif
 - Enforced broken-versus-fixed comparative gate.
 - Reporter-safe remediation timeline.
 - CI runner, sample GitHub Actions workflow, and JSON result artifact.
-- Tamper-evident Redress Receipt with evaluation and proof hashes.
+- Ed25519-signed Redress Receipt with evaluation and proof hashes.
 - One-click synthetic workspace reset.
+
+### Design-partner foundation
+
+- Signed role tokens for reporter, reviewer, developer, administrator, and independent partner boundaries.
+- Append-only consent changes and withdrawal.
+- AES-256-GCM private artifact encryption and configurable regional metadata.
+- Evidence version graph with exact dependency invalidation and automatic re-review queue.
+- Idempotent background evaluation jobs.
+- Recorded, HTTPS-allowlisted HTTP, and OpenAI-compatible adapters with server-side secret references.
+- LangSmith, Braintrust, Langfuse, and OECD-compatible exports.
+
+### Assurance and community network
+
+- Mutation detection, grader calibration, repeat-run stability with 95% confidence intervals, severity policy, and a neighboring fix-scope guard.
+- Multi-turn/tool trajectory schema and deterministic tool-call assertions.
+- Ed25519 proof bundles, evidence pins, and a verifiable hash-chained audit log.
+- Privacy-safe failure fingerprints and minimum-group suppression for aggregate patterns.
+- Reviewer-controlled counterfactuals and semantic-versioned community packs.
+- Maintainer conflict disclosure, compensation records, locale support, and WCAG 2.2 AA tracking.
+- Encrypted independent-verification escrow.
+- Workspace retention/region/SSO policy, remediation SLOs, recurrence, release blocking, integration delivery records, and non-legal regulatory crosswalks.
 
 ## Architecture
 
@@ -111,17 +132,21 @@ AI output never approves privacy, consent, evidence, expected behavior, or verif
 React + TypeScript client
         │
         ▼
-Express API ──────► private artifact boundary (data/originals)
+Express API ──────► encrypted private artifact boundary (data/encrypted)
    │
    ├── privacy + incident workflow
    ├── evidence-linked compiler
    ├── deterministic grader
    ├── optional GPT-5.6 Responses API service
    ├── comparative validation gate
-   └── proof/receipt exporter
+   ├── assurance + governed pack engine
+   ├── role, consent, evidence graph, jobs, SLO + recurrence policy
+   └── signed proof/receipt + interoperability exporters
         │
         ▼
 portable JSON case ──► standalone Node runner ──► CI result
+        │
+        └────────────► TypeScript SDK / third-party dataset exports
 ```
 
 Important directories:
@@ -129,12 +154,27 @@ Important directories:
 - `src/` — product interface and shared types.
 - `server/` — API, OpenAI integration, compiler, grader, validation gate, and receipts.
 - `runner/` — portable command-line evaluation runner.
+- `sdk/` — small vendor-neutral TypeScript client for proof and recurrence workflows.
+- `db/migrations/` — PostgreSQL production schema spanning all roadmap phases.
 - `evals/` — generated, privacy-safe evaluation fixtures.
 - `fixtures/` — fictional source data and demo targets.
 - `docs/` — competitive research, roadmap, architecture decisions, and demo assets.
 - `.github/workflows/` — runnable sample CI integration.
 
-The MVP uses an in-memory case store for instant reset and judge reliability. The production roadmap replaces this with a relational database, encrypted object storage, authenticated workspaces, and asynchronous evaluation jobs.
+Judge mode uses resettable process state for reliability. Setting `REDRESSCI_PERSIST=1` enables durable atomic local snapshots. The repository also includes a complete PostgreSQL schema for managed production deployments; encrypted local artifacts, signed identities, idempotent jobs, evidence invalidation, and asynchronous job state are implemented now.
+
+## Assurance Network demo
+
+Open **Assurance network** in the sidebar, then select **Run full assurance suite**. RedressCI will:
+
+1. mutate the known-fixed answer to confirm the evaluation catches approved failure modes;
+2. calculate rule/model agreement and inconclusive rates;
+3. repeat the fixed run according to severity and record a 95% confidence interval;
+4. execute the neighboring privacy/fix-scope guard;
+5. propose governed multilingual and accessibility variations; and
+6. seal hidden evaluation material for the synthetic independent partner.
+
+The page then exposes a signed proof bundle and OECD-compatible record without including reporter originals.
 
 ## API
 
@@ -161,18 +201,68 @@ POST   /api/cases/:id/status
 GET    /api/cases/:id/export
 GET    /api/cases/:id/receipt
 POST   /api/reset
+
+GET    /api/platform
+GET    /api/platform/readiness
+GET    /api/platform/audit
+POST   /api/cases/:id/consent
+PUT    /api/cases/:id/evidence/:evidenceId/version
+POST   /api/cases/:id/jobs
+POST   /api/cases/:id/assurance
+GET    /api/cases/:id/proof
+POST   /api/platform/proofs/verify
+POST   /api/cases/:id/counterfactuals
+POST   /api/cases/:id/escrow
+GET    /api/cases/:id/export/:provider
+GET    /api/cases/:id/oecd
+GET    /api/cases/:id/slo
+POST   /api/cases/:id/recurrences
+GET    /api/platform/patterns
+PUT    /api/platform/workspace/policy
+POST   /api/platform/integrations/:id/deliver
 ```
+
+## Production configuration and deployment
+
+Copy `.env.example` and set secrets through the deployment platform rather than committing them. Important controls are:
+
+```text
+REDRESSCI_PERSIST=1
+REDRESSCI_AUTH_SECRET=<random secret>
+REDRESSCI_AUTH_REQUIRED=1
+REDRESSCI_STORAGE_KEY=<random encryption secret>
+REDRESSCI_ESCROW_KEY=<separate random encryption secret>
+REDRESSCI_SIGNING_PRIVATE_KEY=<stable Ed25519 PEM private key>
+REDRESSCI_STORAGE_REGION=us
+REDRESSCI_TARGET_ALLOWLIST=api.example.org
+```
+
+Live adapters require HTTPS and a hostname in `REDRESSCI_TARGET_ALLOWLIST`; the hostname is rechecked immediately before every request. Credentials are looked up only from named server environment variables. The included `Dockerfile` and `render.yaml` provide a judge-ready deployment definition.
+
+When `REDRESSCI_AUTH_REQUIRED=1`, anonymous and invalid-token requests cannot inherit demo access. Provision initial short-lived bearer tokens server-side with:
+
+```bash
+npm run auth:token -- admin member-admin "Workspace administrator"
+```
+
+The command signs the role and workspace claims with `REDRESSCI_AUTH_SECRET`; do not run it in a client or expose that secret to the browser.
+
+For a managed production environment, apply [the PostgreSQL migration](db/migrations/001_all_phases.sql), replace the local state adapter with PostgreSQL transactions, and map the encrypted artifact boundary to a regional object store/KMS. SSO and third-party integration delivery require the organization’s identity-provider and app credentials.
 
 ## Safety and privacy boundaries
 
 - The public test fixture contains no original reporter identity.
 - Originals are written only under the private artifact boundary and are excluded from Git.
 - Uploaded formats and size are restricted; uploaded code is never executed.
+- Private uploads are encrypted with AES-256-GCM before being written to disk.
 - Credentials stay server-side and are never included in generated tests.
 - Model output cannot directly change consent or verification state.
 - Compilation is blocked when reviewed evidence or assertions still appear to contain personal data.
 - Assertions cannot compile unless they cite approved evidence.
 - Inconclusive grading remains explicit and cannot silently become a pass.
+- Evidence changes invalidate dependent assertions, evaluations, packs, and receipts instead of silently preserving stale assurance.
+- Signed proof and receipt verification fails after payload tampering.
+- Aggregate fingerprint groups below the workspace privacy threshold are suppressed.
 - “Verified” means one scoped behavior passed comparative validation; it is not a system-wide safety certification.
 - The MVP never names a real organization or uses a real high-consequence case.
 
