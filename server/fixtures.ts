@@ -144,6 +144,8 @@ export function createDemoCase(): RedressCase {
       { id: "T5", label: "Recorded correction verified", detail: "The recorded version 1.3 response failed and the recorded version 1.4 response passed this evaluation. No deployed system was called.", actor: "RedressCI validation gate", createdAt: now, complete: true },
     ],
     questions: ["Should future tests also cover facilities whose accessibility status is temporarily unknown?"],
+    evidenceSuggestions: [],
+    liveVerifications: [],
     createdAt: "2026-07-18T14:05:00.000Z",
     updatedAt: now,
   };

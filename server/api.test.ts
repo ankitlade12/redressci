@@ -58,7 +58,35 @@ test("judge API path exposes demo, executes gate, and issues a receipt", async (
   const forbiddenPolicyUpdate = await fetch(`${base}/api/platform/workspace/policy`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${reporterAuth.token}` }, body: JSON.stringify({ retentionDays: 30 }) });
   assert.equal(forbiddenPolicyUpdate.status, 403);
 
+  const linkResponse = await fetch(`${base}/api/cases/RC-1042/reporter-link`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${reporterAuth.token}` }, body: "{}" });
+  const link = await linkResponse.json() as { token: string; path: string; expiresAt: string };
+  assert.equal(linkResponse.status, 201);
+  assert.match(link.path, /^\/status\//);
+  const reporterStatusResponse = await fetch(`${base}/api/public/status/${link.token}`);
+  const reporterStatus = await reporterStatusResponse.json() as { status: { caseId: string; receiptAvailable: boolean; preferences: { reviewQuestions: boolean } } };
+  assert.equal(reporterStatusResponse.status, 200);
+  assert.equal(reporterStatus.status.caseId, "RC-1042");
+  assert.equal(reporterStatus.status.receiptAvailable, true);
+  assert.doesNotMatch(JSON.stringify(reporterStatus), /originalTranscript|Maya Chen/);
+  const preferencesResponse = await fetch(`${base}/api/public/status/${link.token}/preferences`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reviewQuestions: false }) });
+  const preferences = await preferencesResponse.json() as { preferences: { reviewQuestions: boolean } };
+  assert.equal(preferences.preferences.reviewQuestions, false);
+  const privateReceipt = await fetch(`${base}/api/public/status/${link.token}/receipt`);
+  assert.equal(privateReceipt.status, 200);
+
+  const discoveryResponse = await fetch(`${base}/api/cases/RC-1042/evidence/discover`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+  const discovery = await discoveryResponse.json() as { suggestions: Array<{ status: string; sourceType: string }>; ai: boolean };
+  assert.equal(discoveryResponse.status, 200);
+  assert.equal(discovery.ai, false);
+  assert.equal(discovery.suggestions[0].status, "proposed");
+  assert.equal(discovery.suggestions[0].sourceType, "reviewer-draft");
+
   const developerAuth = await fetch(`${base}/api/auth/demo/developer`, { method: "POST" }).then((response) => response.json()) as { token: string };
+  const githubBundleResponse = await fetch(`${base}/api/cases/RC-1042/github-check`, { headers: { Authorization: `Bearer ${developerAuth.token}` } });
+  const githubBundle = await githubBundleResponse.json() as { bundle: { workflow: string; requiredSecrets: string[] } };
+  assert.equal(githubBundleResponse.status, 200);
+  assert.match(githubBundle.bundle.workflow, /REDRESSCI_TARGET_URL/);
+  assert.deepEqual(githubBundle.bundle.requiredSecrets, ["REDRESSCI_TARGET_URL", "REDRESSCI_TARGET_TOKEN"]);
   const developerView = await fetch(`${base}/api/cases/RC-1042`, { headers: { Authorization: `Bearer ${developerAuth.token}` } }).then((response) => response.json()) as { case: { reporterName: string; originalTranscript: string; artifacts: unknown[]; userInput: string } };
   assert.equal(developerView.case.reporterName, "[REDACTED]");
   assert.equal(developerView.case.originalTranscript, "");

@@ -3,8 +3,8 @@ import express from "express";
 import multer from "multer";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { randomUUID } from "node:crypto";
-import { aiStatus, extractInteraction, proposeIncident } from "./ai.js";
+import { createHash, randomUUID } from "node:crypto";
+import { aiStatus, discoverEvidence, extractInteraction, proposeIncident } from "./ai.js";
 import { attachIdentity, issueToken, requireRole, type Identity } from "./auth.js";
 import { compileCase } from "./compiler.js";
 import { passesValidationGate, runEvaluation, runEvaluationHybrid } from "./evaluation.js";
@@ -12,11 +12,14 @@ import { createDemoCase } from "./fixtures.js";
 import { createRedressReceipt } from "./receipt.js";
 import { findUnredactedPersonalData, proposeRedaction } from "./privacy.js";
 import {
+  adapterMetadata,
   calculateSlo,
   completeReviewTask,
   configureAdapter,
   configurePlatformPersistence,
+  createDeploymentProof,
   createProofBundle,
+  createReporterAccessLink,
   dashboard,
   deliverIntegration,
   enqueueEvaluation,
@@ -24,22 +27,27 @@ import {
   exportDataset,
   fingerprintCase,
   getPlatformState,
+  githubCheckBundle,
   listJobs,
   oecdExport,
   patternReport,
   phaseReadiness,
+  publishGitHubCheck,
   proposeCounterfactuals,
   publicCase,
   recordConsent,
+  recordDeploymentVerification,
   recordRecurrence,
   regulatoryMappings,
   releasePack,
   resetPlatform,
+  resolveReporterAccessLink,
   reviewCounterfactual,
   runAssuranceSuite,
   sealEscrow,
   synchronizeEvidence,
   updateEvidenceVersion,
+  updateReporterPreferences,
   updateWorkspacePolicy,
   verifyAuditChain,
   verifyPlatformDocument,
@@ -270,6 +278,37 @@ app.post("/api/cases/:id/structure", requireRole("reviewer", "admin"), limitAiUs
   } catch (error) { next(error); }
 });
 
+app.post("/api/cases/:id/evidence/discover", requireRole("reviewer", "admin"), limitAiUsage, async (request, response, next) => {
+  try {
+    const item = getCase(String(request.params.id));
+    if (!item) return response.status(404).json({ error: "Case not found" });
+    if (!item.privacyApproved) return response.status(409).json({ error: "Approve the privacy-safe case before searching for evidence." });
+    const discovered = await discoverEvidence({
+      product: item.product,
+      description: item.redactedDescription,
+      expectedBehavior: item.expectedBehavior,
+      category: item.category,
+    });
+    const candidates = discovered?.length ? discovered : [{
+      title: `${item.product} reviewer requirement`,
+      locator: "Reviewer-authored requirement · add an exact policy, dataset record, or URL before approval",
+      excerpt: item.expectedBehavior || "Define the evidence-backed behavior this system should satisfy.",
+      rationale: "Live evidence discovery is unavailable, so this candidate is explicitly marked as a reviewer draft rather than an authoritative source.",
+    }];
+    const mode = discovered?.length ? "live-web-search" : "reviewer-draft";
+    item.evidenceSuggestions = candidates.map((candidate) => ({
+      ...candidate,
+      id: `ES-${randomUUID().slice(0, 8).toUpperCase()}`,
+      authority: discovered?.length ? "authoritative" as const : "reviewer" as const,
+      sourceType: discovered?.length ? "public-web" as const : "reviewer-draft" as const,
+      status: "proposed" as const,
+      createdAt: new Date().toISOString(),
+    }));
+    saveCase(item);
+    response.json({ suggestions: item.evidenceSuggestions, ai: Boolean(discovered?.length), mode });
+  } catch (error) { next(error); }
+});
+
 app.post("/api/cases/:id/evidence", requireRole("reviewer", "admin"), (request, response) => {
   const item = getCase(String(request.params.id));
   if (!item) return response.status(404).json({ error: "Case not found" });
@@ -392,9 +431,59 @@ app.post("/api/cases/:id/validate", requireRole("reviewer", "developer", "admin"
   } catch (error) { next(error); }
 });
 
+app.post("/api/cases/:id/live-verify", requireRole("developer", "admin"), limitAiUsage, async (request, response, next) => {
+  try {
+    const item = getCase(String(request.params.id));
+    if (!item?.evaluation || item.evaluation.status !== "verified") return response.status(409).json({ error: "Pass the recorded broken-versus-corrected gate before verifying a deployment." });
+    const adapterId = String(request.body.adapterId || "");
+    const adapter = adapterMetadata(adapterId);
+    if (adapter.kind === "recorded") return response.status(400).json({ error: "Deployment verification requires an HTTP or OpenAI-compatible live adapter." });
+    const output = await executeAdapter(adapterId, { message: item.evaluation.input.message });
+    const run = await runEvaluationHybrid(item.evaluation, "custom", output);
+    run.targetVersion = String(request.body.targetVersion || adapter.model || "deployed-candidate").slice(0, 120);
+    const verification = {
+      id: `LIVE-${randomUUID().slice(0, 8).toUpperCase()}`,
+      adapterId,
+      adapterName: adapter.name,
+      targetVersion: run.targetVersion,
+      endpointOrigin: adapter.endpointOrigin,
+      runId: run.id,
+      responseSha256: createHash("sha256").update(output).digest("hex"),
+      state: run.state,
+      verified: run.state === "pass",
+      createdAt: new Date().toISOString(),
+    };
+    item.runs = [run, ...item.runs].slice(0, 30);
+    recordDeploymentVerification(request.identity!, item, verification);
+    if (!verification.verified && item.liveVerifications.some((entry) => entry.verified)) item.status = "Regression detected";
+    item.timeline.push({
+      id: randomUUID(),
+      label: verification.verified ? "Deployed fix verified" : "Deployed verification failed",
+      detail: verification.verified ? `The configured live endpoint passed the reviewed evaluation for ${verification.targetVersion}.` : `The configured live endpoint did not pass the reviewed evaluation for ${verification.targetVersion}.`,
+      actor: "RedressCI live verification gate",
+      createdAt: verification.createdAt,
+      complete: verification.verified,
+    });
+    saveCase(item);
+    response.json({ verification, run, deploymentVerified: verification.verified });
+  } catch (error) { next(error); }
+});
+
+app.get("/api/cases/:id/deployment-proof", requireRole("reporter", "reviewer", "developer", "admin", "partner"), (request, response, next) => {
+  try {
+    const item = getCase(String(request.params.id));
+    if (!item) return response.status(404).json({ error: "Case not found" });
+    if (request.identity?.role === "reporter" && item.reporterId !== request.identity.id) return response.status(403).json({ error: "Reporters can only access proof for their own case." });
+    const proof = createDeploymentProof(request.identity!, item);
+    response.setHeader("Content-Disposition", `attachment; filename="${item.id.toLowerCase()}-deployment-proof.json"`);
+    response.json(proof);
+  } catch (error) { next(error); }
+});
+
 app.get("/api/cases/:id/export", requireRole("reporter", "reviewer", "developer", "admin", "partner"), (request, response) => {
   const item = getCase(String(request.params.id));
   if (!item?.evaluation) return response.status(404).json({ error: "No evaluation available." });
+  if (request.identity?.role === "reporter" && item.reporterId !== request.identity.id) return response.status(403).json({ error: "Reporters can only export their own case." });
   const filename = `${item.evaluation.id}.json`;
   response.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
   response.type("application/json").send(JSON.stringify(item.evaluation, null, 2));
@@ -404,6 +493,7 @@ app.get("/api/cases/:id/receipt", requireRole("reporter", "reviewer", "developer
   try {
     const item = getCase(String(request.params.id));
     if (!item) return response.status(404).json({ error: "Case not found" });
+    if (request.identity?.role === "reporter" && item.reporterId !== request.identity.id) return response.status(403).json({ error: "Reporters can only access receipts for their own case." });
     const receipt = createRedressReceipt(item);
     response.setHeader("Content-Disposition", `attachment; filename="${item.id.toLowerCase()}-redress-receipt.json"`);
     response.type("application/json").send(JSON.stringify(receipt, null, 2));
@@ -422,6 +512,68 @@ app.post("/api/cases/:id/status", requireRole("reporter", "reviewer", "developer
   response.json({ case: item });
 });
 
+app.post("/api/cases/:id/reporter-link", requireRole("reporter", "admin"), (request, response, next) => {
+  try {
+    const item = getCase(String(request.params.id));
+    if (!item) return response.status(404).json({ error: "Case not found" });
+    if (request.identity?.role === "reporter" && item.reporterId !== request.identity.id) return response.status(403).json({ error: "Reporters can only create a status link for their own case." });
+    if (item.intakeType !== "affected-person") return response.status(400).json({ error: "Private reporter links are available only for affected-person reports." });
+    const link = createReporterAccessLink(request.identity!, item);
+    response.status(201).json({ ...link, path: `/status/${link.token}` });
+  } catch (error) { next(error); }
+});
+
+app.get("/api/public/status/:token", (request, response, next) => {
+  try {
+    const link = resolveReporterAccessLink(String(request.params.token));
+    const item = getCase(link.caseId);
+    if (!item) return response.status(404).json({ error: "Case not found" });
+    response.json({ status: {
+      caseId: item.id,
+      title: item.privacyApproved ? item.redactedTitle : "Private AI failure report received",
+      product: item.product,
+      status: item.status,
+      consent: item.consent,
+      updatedAt: item.updatedAt,
+      expectedBehavior: item.review.expectedBehaviorApproved ? item.expectedBehavior : undefined,
+      timeline: item.timeline.map(({ label, detail, createdAt, complete }) => ({ label, detail, createdAt, complete })),
+      receiptAvailable: item.evaluation?.status === "verified",
+      deploymentVerified: item.liveVerifications.some((entry) => entry.verified),
+      preferences: link.preferences,
+      privacyNotice: "This private link shows status and reviewed outcomes only. Original transcripts, artifacts, identity data, and reviewer-only evidence are excluded.",
+    } });
+  } catch (error) { next(error); }
+});
+
+app.put("/api/public/status/:token/preferences", (request, response, next) => {
+  try { response.json({ preferences: updateReporterPreferences(String(request.params.token), request.body || {}) }); }
+  catch (error) { next(error); }
+});
+
+app.get("/api/public/status/:token/receipt", (request, response, next) => {
+  try {
+    const link = resolveReporterAccessLink(String(request.params.token));
+    const item = getCase(link.caseId);
+    if (!item) return response.status(404).json({ error: "Case not found" });
+    const receipt = createRedressReceipt(item);
+    response.setHeader("Content-Disposition", `attachment; filename="${item.id.toLowerCase()}-redress-receipt.json"`);
+    response.json(receipt);
+  } catch (error) { next(error); }
+});
+
+app.post("/api/public/status/:token/withdraw", (request, response, next) => {
+  try {
+    const link = resolveReporterAccessLink(String(request.params.token));
+    const item = getCase(link.caseId);
+    if (!item) return response.status(404).json({ error: "Case not found" });
+    item.status = "Withdrawn";
+    item.timeline.push({ id: randomUUID(), label: "Consent withdrawn", detail: "The reporter withdrew this report through the private status link.", actor: "Reporter", createdAt: new Date().toISOString(), complete: true });
+    saveCase(item);
+    recordConsent({ id: `reporter-link:${link.id}`, name: "Reporter", role: "reporter", workspaceId: getPlatformState().workspace.id }, { caseId: item.id, scope: "public-case", action: "withdrawn", reason: String(request.body?.reason || "Withdrawn through private status link").slice(0, 500) });
+    response.json({ withdrawn: true, status: item.status });
+  } catch (error) { next(error); }
+});
+
 // All-phase product APIs. The credential-free demo receives an admin identity;
 // bearer tokens from /api/auth/demo/:role exercise the same role boundaries.
 app.get("/api/platform", requireRole("reviewer", "developer", "admin", "partner"), (_request, response) => response.json({ platform: dashboard(listCases()) }));
@@ -432,6 +584,7 @@ app.post("/api/cases/:id/consent", requireRole("reporter", "admin"), (request, r
   try {
     const item = getCase(String(request.params.id));
     if (!item) return response.status(404).json({ error: "Case not found" });
+    if (request.identity?.role === "reporter" && item.reporterId !== request.identity.id) return response.status(403).json({ error: "Reporters can only change consent for their own case." });
     const consent = recordConsent(request.identity!, { caseId: item.id, scope: request.body.scope, action: request.body.action, reason: request.body.reason });
     if (consent.action === "withdrawn") { item.status = "Withdrawn"; saveCase(item); }
     response.status(201).json({ consent });
@@ -562,6 +715,29 @@ app.put("/api/platform/workspace/policy", requireRole("admin"), (request, respon
 app.post("/api/platform/integrations/:id/deliver", requireRole("developer", "admin"), (request, response, next) => {
   try { response.json({ integration: deliverIntegration(request.identity!, String(request.params.id), request.body.event || "evaluation.verified") }); }
   catch (error) { next(error); }
+});
+app.get("/api/cases/:id/github-check", requireRole("reviewer", "developer", "admin"), (request, response, next) => {
+  try {
+    const item = getCase(String(request.params.id));
+    if (!item) return response.status(404).json({ error: "Case not found" });
+    response.json({ bundle: githubCheckBundle(item), configured: getPlatformState().integrations.find((entry) => entry.id === "integration-github")?.state === "configured" });
+  } catch (error) { next(error); }
+});
+app.get("/api/cases/:id/github-workflow", requireRole("reviewer", "developer", "admin"), (request, response, next) => {
+  try {
+    const item = getCase(String(request.params.id));
+    if (!item) return response.status(404).json({ error: "Case not found" });
+    const bundle = githubCheckBundle(item);
+    response.setHeader("Content-Disposition", "attachment; filename=redressci.yml");
+    response.type("text/yaml").send(bundle.workflow);
+  } catch (error) { next(error); }
+});
+app.post("/api/cases/:id/github-check", requireRole("developer", "admin"), async (request, response, next) => {
+  try {
+    const item = getCase(String(request.params.id));
+    if (!item) return response.status(404).json({ error: "Case not found" });
+    response.status(201).json({ check: await publishGitHubCheck(request.identity!, item, String(request.body.commitSha || "")) });
+  } catch (error) { next(error); }
 });
 app.get("/api/cases/:id/regulatory-mappings", requireRole("reviewer", "admin", "partner"), (request, response) => {
   const item = getCase(String(request.params.id));

@@ -113,6 +113,12 @@ Private attachments are read from encrypted server-side storage. Plain-text file
 - CI runner, sample GitHub Actions workflow, and JSON result artifact.
 - Ed25519-signed Redress Receipt with evaluation and proof hashes.
 - One-click synthetic workspace reset.
+- A live remediation loop that calls an allowlisted deployed endpoint, evaluates the real response, and issues a separate signed deployment proof.
+- Private reporter status links with a simplified timeline, update preferences, receipt access, and consent withdrawal.
+- GPT-5.6 evidence-source discovery over privacy-approved case text; every result remains a proposed candidate until human review.
+- A downloadable deployed-target GitHub Actions check and optional GitHub Checks API publishing.
+- A privacy-safe recurring-failure radar with minimum-group suppression.
+- Browser-provided voice input for the interaction and impact fields, with editable text before submission.
 
 ### Design-partner foundation
 
@@ -206,7 +212,14 @@ PUT    /api/cases/:id/targets
 POST   /api/cases/:id/compile
 POST   /api/cases/:id/runs
 POST   /api/cases/:id/validate
+POST   /api/cases/:id/live-verify
+GET    /api/cases/:id/deployment-proof
 POST   /api/cases/:id/status
+POST   /api/cases/:id/reporter-link
+POST   /api/cases/:id/evidence/discover
+GET    /api/cases/:id/github-check
+GET    /api/cases/:id/github-workflow
+POST   /api/cases/:id/github-check
 GET    /api/cases/:id/export
 GET    /api/cases/:id/receipt
 POST   /api/reset
@@ -229,6 +242,11 @@ POST   /api/cases/:id/recurrences
 GET    /api/platform/patterns
 PUT    /api/platform/workspace/policy
 POST   /api/platform/integrations/:id/deliver
+
+GET    /api/public/status/:token
+PUT    /api/public/status/:token/preferences
+GET    /api/public/status/:token/receipt
+POST   /api/public/status/:token/withdraw
 ```
 
 ## Production configuration and deployment
@@ -244,9 +262,14 @@ REDRESSCI_ESCROW_KEY=<separate random encryption secret>
 REDRESSCI_SIGNING_PRIVATE_KEY=<stable Ed25519 PEM private key>
 REDRESSCI_STORAGE_REGION=us
 REDRESSCI_TARGET_ALLOWLIST=api.example.org
+REDRESSCI_TARGET_TOKEN=<server-side deployed-target token>
+REDRESSCI_GITHUB_REPOSITORY=owner/repository
+REDRESSCI_GITHUB_TOKEN=<GitHub App installation token>
 ```
 
 Live adapters require HTTPS and a hostname in `REDRESSCI_TARGET_ALLOWLIST`; the hostname is rechecked immediately before every request. Credentials are looked up only from named server environment variables. The included `Dockerfile` and `render.yaml` provide a judge-ready deployment definition.
+
+`Verified fixed` is reserved for an actual pass from `POST /api/cases/:id/live-verify`. The earlier recorded-response comparison remains labeled `Evaluation verified`. GitHub workflow generation needs no GitHub credential; posting a check run additionally requires `REDRESSCI_GITHUB_REPOSITORY` and a short-lived GitHub App installation token in `REDRESSCI_GITHUB_TOKEN`.
 
 When `REDRESSCI_AUTH_REQUIRED=1`, anonymous and invalid-token requests cannot inherit demo access. Provision initial short-lived bearer tokens server-side with:
 
