@@ -4,9 +4,13 @@
 
 RedressCI converts a reported AI failure into a privacy-safe, evidence-backed regression test, proves that it fails on the broken system and passes on the corrected one, and exports the test to CI so the same failure cannot silently return.
 
-**OpenAI Build Week track:** Developer Tools  
+**OpenAI Build Week track:** Developer Tools
+
 **Status:** runnable all-phase product foundation
+
 **Demo data:** entirely fictional and synthetic
+
+**Hosted demo:** <https://redressci.onrender.com>
 
 ## Why this exists
 
@@ -37,6 +41,8 @@ Open [http://localhost:5173](http://localhost:5173). No login, API key, or propr
 3. Open **Validation** and select **Run validation gate**.
 4. See version 1.3 fail and version 1.4 pass for evidence-linked reasons.
 5. Open **CI export** to download the portable case and the Redress Receipt.
+
+Use the **View privacy boundary as** selector in the sidebar to compare reporter, reviewer, developer, administrator, and independent-verifier access. The developer view is served without the reporter name or original transcript.
 
 To exercise the full fresh-report lifecycle, select **Report a failure** and use synthetic information:
 
@@ -286,6 +292,7 @@ For the Devpost submission, add the `/feedback` Codex Session ID from the projec
 - [Competitive research and novelty strategy](docs/COMPETITIVE_RESEARCH.md)
 - [Prioritized product roadmap](docs/PRODUCT_ROADMAP.md)
 - [Current implementation status and enforced invariants](docs/IMPLEMENTATION_STATUS.md)
+- [Product readiness and adoption audit](docs/PRODUCT_READINESS_AUDIT.md)
 - [Three-minute demo script](docs/DEMO_SCRIPT.md)
 - [Original product specification](RedressCI_Feature_Specification.md)
 

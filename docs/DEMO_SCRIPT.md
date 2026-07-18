@@ -13,11 +13,13 @@
 
 ## 0:18–0:52 — Person, privacy, evidence
 
-**Screen:** Overview, then Evidence.
+**Screen:** Briefly select Reporter in the role switcher, open the case, then show Overview and Evidence.
 
 **Narration:**
 
 “This synthetic resident asked for a wheelchair-accessible cooling center and was directed to Central Hall, which has stairs and no lift. RedressCI keeps the original report private, removes the person’s name, and records their consent. A human reviewer approves the source records and expected behavior. Every generated assertion points back to exact evidence.”
+
+**Optional two-second proof:** switch to Developer and reopen the case; the server-provided view shows `[REDACTED]` and omits the original transcript.
 
 ## 0:52–1:20 — Compile the evaluation
 
@@ -57,6 +59,7 @@
 - Use audio and explicitly state how both Codex and GPT-5.6 were used.
 - Do not include copyrighted music, real brands, or real personal information.
 - Show the validation button being selected and both results appearing.
+- Show one role-boundary transition; avoid spending time touring every role.
 - Keep the final upload below three minutes; judges are not required to watch beyond it.
 - Run the Assurance network suite once before recording so its mutation and stability metrics are visible.
 - Download the signed proof bundle only after the comparative gate is verified.
