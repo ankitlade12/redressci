@@ -86,7 +86,7 @@
 
 ## Automated verification
 
-The suite currently covers 35 checks, including:
+The suite currently covers 37 checks, including:
 
 - broken-target failure and corrected-target success;
 - validation-gate ordering;
