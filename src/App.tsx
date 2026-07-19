@@ -38,13 +38,13 @@ function Shell({ children, page, onNavigate, onReport, ai, role, roleBusy, onRol
         <span className="avatar">{role.slice(0, 2).toUpperCase()}</span>
         <label><small>VIEW PRIVACY BOUNDARY AS</small><select value={role} disabled={roleBusy} onChange={(event) => onRoleChange(event.target.value as WorkspaceRole)} aria-label="View demo as role">{Object.entries(roleLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
       </div>
-      <div className={`ai-status ${ai ? "online" : ""}`}><span />{ai ? "Live AI configured" : "Synthetic demo mode"}</div>
+      <div className={`ai-status ${ai ? "online" : ""}`}><span />{ai ? "GPT-5.6 connected" : "GPT-5.6 optional"}</div>
     </aside>
     <main>{children}</main>
   </div>;
 }
 
-function Dashboard({ cases, onOpen, onReport, onReset, canReport, canReset }: { cases: RedressCase[]; onOpen: (id: string) => void; onReport: () => void; onReset: () => void; canReport: boolean; canReset: boolean }) {
+function Dashboard({ cases, onOpen, onReport, onReset, canReport, canReset, ai }: { cases: RedressCase[]; onOpen: (id: string) => void; onReport: () => void; onReset: () => void; canReport: boolean; canReset: boolean; ai: boolean }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"all" | "review" | "verified">("all");
   const verifiedCases = cases.filter(isEvaluationVerified);
@@ -65,12 +65,26 @@ function Dashboard({ cases, onOpen, onReport, onReset, canReport, canReset }: { 
   return <div className="page dashboard-page">
     <header className="topbar"><div /><div className="top-actions"><label className="case-search"><Icon name="search" size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search cases" aria-label="Search cases" /></label><button className="button primary" onClick={onReport} disabled={!canReport} title={canReport ? "Create a private report" : "Switch to Reporter to submit a report"}><Icon name="plus" size={17} />Report a failure</button></div></header>
     <section className="hero">
-      <div className="eyebrow"><span /> FROM EXPERIENCE TO PROTECTION</div>
-      <h1>Turn AI failures into<br /><em>tests that stay fixed.</em></h1>
-      <p>RedressCI gives every reported failure a path to evidence, verification, and permanent regression protection.</p>
-      <div className="hero-actions"><button className="button dark" disabled={!verifiedCases[0]} onClick={() => verifiedCases[0] && onOpen(verifiedCases[0].id)}>Explore the verified evaluation <Icon name="arrow" size={17} /></button>{canReset && <button className="button quiet" onClick={onReset}><Icon name="refresh" size={17} />Reset demo</button>}</div>
+      <div className="hero-grid">
+        <div className="hero-copy">
+          <div className="eyebrow"><span /> FROM EXPERIENCE TO PROTECTION</div>
+          <h1>Turn AI failures into<br /><em>tests that stay fixed.</em></h1>
+          <p>RedressCI gives every reported failure a path to evidence, verification, and permanent regression protection.</p>
+          <div className="hero-actions"><button className="button dark" disabled={!verifiedCases[0]} onClick={() => verifiedCases[0] && onOpen(verifiedCases[0].id)}>Start the guided demo <Icon name="arrow" size={17} /></button>{canReset && <button className="button quiet" onClick={onReset}><Icon name="refresh" size={17} />Reset demo</button>}</div>
+        </div>
+        <aside className={`ai-value-card ${ai ? "connected" : ""}`} aria-label="How GPT-5.6 helps RedressCI">
+          <header><span><Icon name="sparkle" size={15} /> GPT-5.6</span><b>{ai ? "CONNECTED" : "OPTIONAL"}</b></header>
+          <h2>AI accelerates the work.<br />Humans control the truth.</h2>
+          <ol>
+            <li><span>01</span><div><strong>Structure the failure</strong><small>Extract the interaction and surface uncertainty.</small></div></li>
+            <li><span>02</span><div><strong>Discover evidence</strong><small>Propose public sources from privacy-approved text.</small></div></li>
+            <li><span>03</span><div><strong>Grade meaning</strong><small>Evaluate semantic behavior alongside deterministic rules.</small></div></li>
+          </ol>
+          <footer><Icon name="shield" size={15} /><span>GPT-5.6 never approves privacy, evidence, consent, or verified status.</span></footer>
+        </aside>
+      </div>
     </section>
-    <section className="lifecycle-strip" aria-label="RedressCI workflow">{[["01", "Report", "Capture the affected person’s experience"], ["02", "Review", "Approve privacy, evidence, and expectations"], ["03", "Prove", "Require broken-fails and fixed-passes"], ["04", "Protect", "Export the case into release CI"]].map(([number, label, copy]) => <div key={number}><span>{number}</span><strong>{label}</strong><small>{copy}</small></div>)}</section>
+    <section className="demo-journey" aria-labelledby="demo-journey-title"><header><span>THE 3-MINUTE JUDGE PATH</span><strong id="demo-journey-title">Follow one failure all the way to permanent protection.</strong></header><div className="lifecycle-strip">{[["01", "Report the failure", "Capture the affected person’s experience"], ["02", "Review the evidence", "Approve privacy, sources, and expectations"], ["03", "Prove the fix", "Require broken-fails and fixed-passes"], ["04", "Prevent regression", "Export the case into release CI"]].map(([number, label, copy]) => <div key={number}><span>{number}</span><strong>{label}</strong><small>{copy}</small></div>)}</div></section>
     <section className="metrics" aria-label="Case metrics">
       <div><small>OPEN CASES</small><strong>{String(needsReview).padStart(2, "0")}</strong><span>Awaiting action</span></div>
       <div><small>EVALUATIONS VERIFIED</small><strong>{String(verified).padStart(2, "0")}</strong><span className="positive">Broken/fixed distinction proven</span></div>
@@ -421,7 +435,7 @@ export default function App() {
   if (page === "status" && route.token) return <ReporterStatusPage token={route.token} onHome={() => window.location.assign("/")} />;
   if (page === "report") return <ReportPage role={role} aiConfigured={ai} onCancel={() => navigate({ page: "dashboard" })} onCreated={(item) => { setCases((current) => [item, ...current]); setSelected(item); navigate({ page: "case", caseId: item.id }); }} />;
   return <Shell page={page} onNavigate={navigatePage} onReport={() => navigate({ page: "report" })} ai={ai} role={role} roleBusy={roleBusy} onRoleChange={switchRole}>
-    {page === "dashboard" && <Dashboard cases={cases} onOpen={openCase} onReport={() => navigate({ page: "report" })} onReset={reset} canReport={role === "reporter" || role === "developer" || role === "admin"} canReset={role === "admin"} />}
+    {page === "dashboard" && <Dashboard cases={cases} onOpen={openCase} onReport={() => navigate({ page: "report" })} onReset={reset} canReport={role === "reporter" || role === "developer" || role === "admin"} canReset={role === "admin"} ai={ai} />}
     {page === "assurance" && <AssurancePage platform={platform} cases={cases} refresh={refreshPlatform} />}
     {page === "radar" && <FailureRadarPage platform={platform} />}
     {page === "case" && selected && <CaseDetail item={selected} onBack={() => navigate({ page: "dashboard" })} refresh={refreshSelected} role={role} />}
