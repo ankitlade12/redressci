@@ -1,6 +1,6 @@
 # RedressCI Product Readiness Audit
 
-**Updated:** July 18, 2026
+**Updated:** July 20, 2026
 
 **Scope:** hosted demo realism, activation, trust, differentiation, and the gap between a hackathon product and a real design-partner pilot.
 
@@ -42,6 +42,12 @@ Sources:
 - Report intake requires a product/system, an interaction or artifact, an impact description, and explicit consent acknowledgement.
 - Attachment size errors and submission failures are visible to the reporter.
 - Copy actions provide completion feedback.
+- A four-stage judge path now guides visitors through Report → Review → Prove → Prevent regression.
+- The landing page identifies where GPT-5.6 adds value and where human approval remains mandatory.
+- Reporters have a private status link with notification preferences, receipt access, and consent withdrawal.
+- Evidence discovery produces review-only candidates from privacy-approved content.
+- The CI handoff includes a deployed-target GitHub Actions workflow and optional Checks API publication.
+- Browser voice intake, deployed verification, and privacy-thresholded failure radar are implemented.
 
 ## Highest-priority gaps before a real pilot
 
@@ -62,26 +68,26 @@ Sources:
 
 ### P1 — Adoption loop
 
-- Give reporters a dedicated status link and notification preferences rather than the full engineering workspace.
 - Add reviewer assignment, due dates, conflict disclosure, evidence-source previews, and structured rejection reasons.
 - Add a developer handoff with owner, linked issue/PR, target configuration status, and next action.
-- Track activation metrics: report completion, time to privacy approval, time to reproduction, validation success, receipt viewed, and CI export installed.
-- Add a lightweight organization onboarding checklist and a sample integration that actually posts a status to GitHub.
+- Add real notification delivery and track activation metrics such as report completion, time to privacy approval, validation success, receipt views, and CI installation.
+- Add a lightweight organization onboarding checklist and a guided production-integration setup.
 
 ### P1 — Credibility and accessibility
 
 - Run keyboard-only, screen-reader, contrast, zoom, and mobile acceptance tests against the reporter journey.
 - Replace broad “operational” phase language with precise labels such as local foundation, configured integration, or externally validated.
 - Recruit at least one accessibility/domain reviewer to evaluate the wording and approval burden.
-- Record a real low-risk pilot case or clearly label all seeded cases synthetic.
+- Record a real low-risk pilot case after the production trust boundary is ready; all current seeded cases are explicitly synthetic.
 
 ## Demo narrative recommendation
 
-Use one case and three perspectives rather than touring every feature:
+Use one case and four visible stages rather than touring every feature:
 
-1. **Reporter:** submit or open the private experience and show consent/redaction.
-2. **Reviewer:** approve evidence and the expected behavior; explain that GPT can propose but cannot approve.
-3. **Developer/verifier:** run the broken-versus-fixed gate, download the receipt, and show the CI protection.
+1. **Report:** open the private experience and show the consent boundary.
+2. **Review:** show approved evidence and explain that GPT-5.6 can propose but cannot approve.
+3. **Prove:** run the broken-versus-fixed gate and show the immutable grader policy.
+4. **Prevent regression:** download the receipt and show the GitHub CI protection.
 
 Finish on the Assurance Network for ten to fifteen seconds only. The memorable claim should be: **“RedressCI does not merely record that an AI failed; it proves the fix and keeps testing it.”**
 
