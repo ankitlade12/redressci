@@ -310,7 +310,7 @@ Open <http://localhost:5173>. Without an OpenAI key, the seeded comparative demo
 
 ### Fresh Report Walkthrough
 
-Select **Report a failure** and use only synthetic information. Copy-ready examples are in [`docs/REPORTING_GUIDE.md`](docs/REPORTING_GUIDE.md).
+Select **Report a failure** and use the seeded CivicAid accessibility scenario or your own entirely synthetic information. Do not submit personal or sensitive data to the public demo.
 
 1. Submit a transcript and optional private artifact.
 2. Compare the original with the proposed redaction and approve the shared version.
@@ -405,7 +405,6 @@ redressci/
 ├── db/migrations/               # Managed PostgreSQL production schema
 ├── evals/                       # Privacy-safe portable evaluation fixtures
 ├── fixtures/                    # Synthetic evidence and product data
-├── docs/                        # Research, roadmap, reporting, readiness, demo script
 ├── scripts/                     # Operational token tooling
 ├── data/                        # Ignored private runtime boundaries; .gitkeep only
 ├── .github/workflows/           # Repository and exported CI workflows
@@ -555,16 +554,6 @@ The majority of RedressCI was built with Codex during OpenAI Build Week. Codex a
 - iterated on demo clarity, GPT-5.6 visibility, documentation, and submission readiness.
 
 Human product decisions remained explicit: begin with the affected person, require reviewed evidence before assertions, keep private originals separate, demand comparative proof before evaluation verification, and reserve deployed-fix claims for live-system evidence.
-
-## Research and Product Documentation
-
-- [Competitive research and novelty strategy](docs/COMPETITIVE_RESEARCH.md)
-- [Prioritized product roadmap](docs/PRODUCT_ROADMAP.md)
-- [Implementation status and enforced invariants](docs/IMPLEMENTATION_STATUS.md)
-- [Product readiness and adoption audit](docs/PRODUCT_READINESS_AUDIT.md)
-- [Reporting and test-case guide](docs/REPORTING_GUIDE.md)
-- [Three-minute demo script](docs/DEMO_SCRIPT.md)
-- [Original product specification](RedressCI_Feature_Specification.md)
 
 ## Production Boundary
 
