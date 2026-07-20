@@ -1108,7 +1108,7 @@ The MVP is complete when:
 - [x] The application enforces the comparative validation gate.
 - [x] The remediation timeline updates to verified fixed.
 - [x] The evaluation can be exported to a sample CI workflow.
-- [ ] The hosted judge path works without private credentials.
+- [x] The hosted judge path works without private credentials.
 - [x] The README explains setup, architecture, Codex collaboration, and GPT-5.6 usage.
 - [x] Automated tests cover the critical workflow.
 - [x] The public demonstration uses only synthetic data.

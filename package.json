@@ -23,8 +23,7 @@
     "openai": "latest",
     "react": "latest",
     "react-dom": "latest",
-    "vite": "latest",
-    "zod": "latest"
+    "vite": "latest"
   },
   "devDependencies": {
     "@types/express": "latest",

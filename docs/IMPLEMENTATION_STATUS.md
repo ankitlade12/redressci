@@ -1,6 +1,6 @@
 # RedressCI Implementation Status
 
-**Updated:** July 18, 2026
+**Updated:** July 20, 2026
 
 ## Working end to end
 
@@ -121,6 +121,7 @@ npm run build
 ## Runtime modes and remaining external milestones
 
 - The hosted judge demo is live at <https://redressci.onrender.com>; browser history, direct routes, role-boundary previews, search/filter controls, truthful metrics, and stricter reporter consent are implemented.
+- The hosted judge demo has GPT-5.6 configured and presents its extraction, evidence-discovery, and semantic-grading roles explicitly.
 - Default judge mode is resettable and credential-free. `REDRESSCI_PERSIST=1` enables atomic durable snapshots.
 - The PostgreSQL schema is production-ready, but a managed database must be provisioned before replacing the local adapter in a hosted environment.
 - Artifacts are encrypted locally; a production deployment should connect the same metadata boundary to a managed regional object store and KMS.
@@ -128,14 +129,13 @@ npm run build
 - The offline runner does not call a model grader. It keeps semantic checks inconclusive unless locally decidable.
 - SSO policy is modeled and enforced as workspace configuration; connecting an actual identity provider requires organization credentials.
 - Public publication, independent partner identity, reviewer compensation, and real design-partner cases require external people and cannot be manufactured in code.
-- The hosted demo URL and narrated video require deployment and recording accounts.
+- The hosted demo URL is deployed; the public narrated video remains a submission task.
 
 ## Next operational milestone
 
 1. Provision managed PostgreSQL, object storage, KMS, and an identity provider before accepting sensitive pilot reports.
-2. Enable the hosted GPT-5.6 secret only with an explicit deployment-secret decision; the public judge path remains deterministic without it.
-3. Complete role-by-role deployed-browser and accessibility acceptance tests.
-4. Record the narrated demonstration and submit it with the hosted URL.
-5. Recruit real design partners and stewards; measure the roadmap success gates with real cases rather than synthetic counters.
+2. Complete role-by-role deployed-browser and accessibility acceptance tests.
+3. Record the narrated demonstration and submit it with the hosted URL.
+4. Recruit real design partners and stewards; measure the roadmap success gates with real cases rather than synthetic counters.
 
 See [PRODUCT_READINESS_AUDIT.md](./PRODUCT_READINESS_AUDIT.md) for the adoption, trust, and production-gap assessment.
