@@ -408,7 +408,6 @@ redressci/
 ├── scripts/                     # Operational token tooling
 ├── data/                        # Ignored private runtime boundaries; .gitkeep only
 ├── .github/workflows/           # Repository and exported CI workflows
-├── RedressCI_Feature_Specification.md
 ├── Dockerfile
 ├── render.yaml
 ├── package.json
