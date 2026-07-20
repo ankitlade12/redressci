@@ -1,199 +1,469 @@
-# RedressCI
+# RedressCI — From AI Failure to Verified Fix
 
-> Turn real AI failures into tests that stay fixed.
+[![Node.js 22+](https://img.shields.io/badge/Node.js-22+-339933.svg?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6.svg?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![OpenAI](https://img.shields.io/badge/OpenAI-GPT--5.6-111111.svg?logo=openai&logoColor=white)](https://developers.openai.com/api/docs/models/gpt-5.6-sol)
+[![Render](https://img.shields.io/badge/Render-live-46E3B7.svg?logo=render&logoColor=111111)](https://redressci.onrender.com)
+[![CI](https://github.com/ankitlade12/redressci/actions/workflows/redressci.yml/badge.svg)](https://github.com/ankitlade12/redressci/actions/workflows/redressci.yml)
+[![Tests](https://img.shields.io/badge/tests-37%20passing-brightgreen.svg)](#reproducible-testing)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-RedressCI converts a reported AI failure into a privacy-safe, evidence-backed regression test, proves that it fails on the broken system and passes on the corrected one, and exports the test to CI so the same failure cannot silently return.
+> **A closed ticket says someone tried. RedressCI proves the fix and keeps testing it.**
 
-**OpenAI Build Week track:** Developer Tools
+RedressCI is an AI remediation and continuous-assurance platform. It turns a reported AI failure into a privacy-safe, evidence-backed regression test, proves that the test catches the broken behavior, recognizes the correction, and carries that protection into CI.
 
-**Status:** runnable all-phase product foundation
+The product begins with the person who experienced the failure—not with a dataset an engineering team already owns. Reporters retain a visible path to closure while reviewers and developers receive only the evidence and artifacts appropriate to their roles.
 
-**Demo data:** entirely fictional and synthetic
+**OpenAI Build Week track:** Developer Tools<br>
+**Demo data:** entirely fictional and synthetic<br>
+**Hosted product:** <https://redressci.onrender.com>
 
-**Hosted demo:** <https://redressci.onrender.com>
+## Quick Highlights
 
-## Why this exists
+- **Reporter-to-CI Remediation** — one governed path from a real-world experience to permanent regression protection
+- **Privacy Before Engineering Access** — original evidence remains separate until a human approves the redacted case
+- **Evidence-Backed Assertions** — every compiled check cites an approved source; changed evidence invalidates dependents
+- **Comparative Proof** — the same evaluation must fail on the known-broken response and pass on the correction
+- **Truthful Verification States** — recorded-response proof and deployed-system verification are labeled separately
+- **Visible Reporter Closure** — private status links, consent withdrawal, timelines, signed receipts, and deployment proof
+- **GPT-5.6 With Boundaries** — AI extracts, structures, discovers, and grades; humans approve truth and authority
+- **CI-Native Protection** — portable JSON evaluations, a standalone runner, GitHub Actions, and optional Checks API output
+- **Measured Evaluation Quality** — mutation detection, calibration, repeat stability, scope guarding, and inconclusive outcomes
+- **Privacy-Safe Network Learning** — recurring mechanisms surface only after minimum-group privacy thresholds are met
 
-An AI failure usually becomes a support ticket. An eval usually begins with a dataset an engineer already has. The affected person is missing from the engineering loop, and a closed ticket does not prove that a fix works.
+## Live Deployment
 
-RedressCI creates a new bridge—**Remediation CI**:
+| Surface | URL | Access |
+|---|---|---|
+| **Product** | <https://redressci.onrender.com> | Public synthetic judge workspace |
+| **Health check** | <https://redressci.onrender.com/api/health> | Public JSON status |
+| **Reporter status** | `/status/:token` | Expiring and revocable private link |
+| **Portable runner** | [`runner/cli.ts`](runner/cli.ts) | Local or CI execution |
+| **GitHub workflow** | [`.github/workflows/redressci.yml`](.github/workflows/redressci.yml) | Repository CI |
 
-```text
-experience → privacy review → approved evidence → portable test
-           → broken/fixed proof → reporter closure → CI protection
+The hosted workspace is intentionally resettable and credential-free for judging. GPT-5.6 is configured on the server, while deterministic fixtures keep the primary demo reliable. The public deployment is a synthetic demonstration—not a destination for sensitive reports.
+
+## Architecture Overview
+
+### The Remediation Loop
+
+```mermaid
+flowchart LR
+    R[Report the failure] --> P[Privacy review]
+    P --> E[Approved evidence]
+    E --> C[Compile portable evaluation]
+    C --> G{Comparative gate}
+    G -->|Broken must fail| B[Known-broken proof]
+    G -->|Correction must pass| F[Corrected proof]
+    B --> V[Evaluation verified]
+    F --> V
+    V --> X[Receipt and CI export]
+    X --> D[Deployed target run]
+    D -->|Passes reviewed evaluation| L[Verified fixed]
+    L --> N[Reporter closure and recurrence monitoring]
 ```
 
-The central invariant is enforced in application logic: an evaluation cannot become verified unless it **fails on a known-broken response and passes on a corrected response**. Recorded-response proof is labeled separately from deployed-system verification.
+### System Architecture
 
-## Judge quickstart
+```mermaid
+graph TB
+    subgraph "PRODUCT EXPERIENCE"
+        REPORT[Reporter intake and private evidence]
+        REVIEW[Privacy and evidence review]
+        CASE[Case, validation, timeline, and CI views]
+        STATUS[Private reporter status]
+        RADAR[Privacy-safe failure radar]
+    end
 
-Requirements: Node.js 22+ and npm. Tested on macOS and designed to run on Linux and Windows.
+    subgraph "APPLICATION LAYER"
+        UI[React + TypeScript client]
+        API[Express API]
+        COMPILER[Evidence-linked compiler]
+        GRADER[Deterministic + semantic grader]
+        ASSURANCE[Assurance and governance engine]
+        EXPORT[Runner, SDK, proofs, and exports]
+    end
+
+    subgraph "TRUST BOUNDARY"
+        GPT[GPT-5.6 Responses API]
+        HUMAN[Human approval gates]
+        AUTH[Signed roles and ownership checks]
+        CRYPTO[AES-GCM storage + Ed25519 proof signing]
+    end
+
+    subgraph "DATA AND DELIVERY"
+        STATE[(Case and platform state)]
+        PRIVATE[(Encrypted private artifacts)]
+        EVAL[(Portable evaluation JSON)]
+        CI[GitHub Actions / external CI]
+        TARGET[Allowlisted deployed target]
+    end
+
+    REPORT --> UI
+    REVIEW --> UI
+    CASE --> UI
+    STATUS --> API
+    RADAR --> API
+    UI --> API
+    API --> AUTH
+    API --> HUMAN
+    API --> GPT
+    API --> COMPILER
+    COMPILER --> GRADER
+    GRADER --> ASSURANCE
+    API --> STATE
+    API --> CRYPTO
+    CRYPTO --> PRIVATE
+    COMPILER --> EVAL
+    EVAL --> EXPORT
+    EXPORT --> CI
+    API --> TARGET
+
+    style HUMAN fill:#e4f0e8,stroke:#146b48,stroke-width:2px
+    style GPT fill:#eef0ff,stroke:#4e5ba6,stroke-width:2px
+    style PRIVATE fill:#f7e9e5,stroke:#a94336,stroke-width:2px
+    style EVAL fill:#f4f8dc,stroke:#72851f,stroke-width:2px
+```
+
+### Hosted Runtime
+
+```mermaid
+graph LR
+    GH[GitHub main] --> BUILD[Render Docker build]
+    BUILD --> SERVICE[RedressCI web service]
+    SERVICE --> WEB[React application]
+    SERVICE --> API[Express API]
+    SERVICE --> HEALTH[GET /api/health]
+    SERVICE --> OPENAI[GPT-5.6 Responses API]
+    SERVICE --> STORE[(Encrypted local demo state)]
+```
+
+The central design rule is enforced in code: **GPT-5.6 may propose and grade, but only reviewed evidence, human approval, and successful execution can establish verified status.**
+
+### Tech Stack
+
+| Layer | Technology | Purpose |
+|---|---|---|
+| **Interface** | React + Vite | Reporter, reviewer, developer, verifier, and status-link experiences |
+| **Language** | TypeScript in strict mode | Shared contracts across product, API, runner, and SDK |
+| **API** | Node.js 22 + Express | Workflow enforcement, role boundaries, artifacts, and exports |
+| **Model layer** | OpenAI GPT-5.6 Responses API | Extraction, incident structuring, evidence discovery, and semantic grading |
+| **Deterministic evaluation** | Custom compiler and grader | Evidence-linked rules, comparative gate, and portable results |
+| **Private storage** | AES-256-GCM artifact boundary | Encryption of reporter-supplied private evidence |
+| **Proof** | Ed25519 signatures + SHA-256 | Receipts, deployment proof, proof bundles, and tamper detection |
+| **CI** | Standalone TypeScript runner + GitHub Actions | Release regression protection and machine-readable results |
+| **Deployment** | Docker + Render | Hosted judge build and health checks |
+| **Production foundation** | PostgreSQL migration + vendor-neutral SDK | Design-partner persistence and interoperability path |
+
+## The Problem
+
+An AI failure usually becomes a support ticket, screenshot, or incident entry. Even when a team closes the ticket, three questions remain unanswered:
+
+- Was the harmful behavior reproduced for the intended reason?
+- Did the correction actually satisfy an evidence-backed expectation?
+- Will the same failure be caught after the next prompt, model, retrieval, or code change?
+
+Traditional incident databases preserve memory. Evaluation platforms test developer-owned datasets. Support systems track resolution status. The person who experienced the failure is rarely connected to executable proof or lasting engineering protection.
+
+**A report should not disappear into a queue. It should become a test that stays fixed.**
+
+## The Solution
+
+RedressCI creates a governed remediation record:
+
+1. A reporter submits the observed interaction and impact using text, an attachment, or editable voice dictation.
+2. The original evidence starts private and is stored separately from the shareable case.
+3. A reviewer inspects the proposed redaction and explicitly approves the privacy-safe version.
+4. Evidence, expected behavior, assertions, and recorded targets receive separate human approval.
+5. RedressCI compiles a portable evaluation in which every assertion cites approved evidence.
+6. The known-broken response must fail and the recorded correction must pass under the same grader policy.
+7. The reporter receives a timeline and signed Redress Receipt; the developer receives a CI-ready test.
+8. A separate live-adapter run is required before the product may claim the deployed system is verified fixed.
+
+The result is not another issue tracker or evaluation dashboard. It is a remediation compiler connecting experience, evidence, proof, closure, and release protection.
+
+## Remediation Lifecycle
+
+```mermaid
+sequenceDiagram
+    participant R as Reporter
+    participant C as RedressCI
+    participant H as Human reviewer
+    participant G as Evaluation gate
+    participant D as Developer CI
+
+    R->>C: Submit observed AI failure
+    C->>C: Encrypt original evidence
+    C->>H: Propose privacy-safe case
+    H->>C: Approve or edit redaction
+    C->>H: Present evidence and expected behavior
+    H->>C: Approve evidence-linked evaluation
+    C->>G: Run known-broken response
+    G-->>C: Fail for intended reason
+    C->>G: Run recorded correction
+    G-->>C: Pass reviewed requirements
+    C-->>R: Timeline + signed receipt
+    C-->>D: Portable evaluation + CI workflow
+    D->>C: Run against deployed candidate
+    C-->>D: Deployment proof or release-blocking failure
+```
+
+## Product Features
+
+### Guided Reporting and Private Evidence
+
+- Non-technical, three-step affected-person intake
+- Separate internal-incident intake for authorized developers
+- Text, PNG, JPG, WebP, PDF, and private attachment handling
+- Permission-aware browser dictation that stores only submitted text—not audio
+- Encrypted artifact storage with case ownership checks
+- Explicit consent scope and append-only consent history
+
+### Human-Owned Privacy and Evidence
+
+- Proposed redaction for names, email, phone, and account identifiers
+- Side-by-side original and shared review for authorized roles
+- Leak rechecking after manual edits
+- Versioned evidence with exact assertion and evaluation dependencies
+- Reviewer-controlled evidence discovery candidates
+- Compilation blocked when reviewed material still appears to contain personal data
+
+### Evidence-Backed Evaluation Compilation
+
+- Provider-neutral JSON evaluation format
+- Forbidden-entity, required-concept, semantic-rubric, and tool-trajectory assertions
+- Assertion-level evidence citations
+- General expected-behavior rule kept distinct from candidate response text
+- Deterministic checks remain deterministic
+- Semantic checks preserve explicit pass, fail, or inconclusive outcomes
+
+### Comparative and Deployed Proof
+
+- Known-broken target must fail for the intended reason
+- Recorded correction must pass the same evaluation
+- Both runs share one immutable grader-policy hash
+- `Evaluation verified` never implies that a live deployment was called
+- `Verified fixed` requires an allowlisted live-system run
+- Separate signed deployment proof records endpoint origin, version, hashes, and results
+
+### Reporter Closure
+
+- Plain-language remediation timeline
+- Expiring and revocable private status links
+- Notification preferences and consent withdrawal
+- Signed Redress Receipt containing evaluation and proof hashes
+- No original identity or artifact content in portable receipts
+
+### CI and Remediation Network
+
+- Standalone runner with non-zero regression exit codes
+- Downloadable GitHub Actions workflow for deployed-target checks
+- Optional GitHub Checks API publishing
+- TypeScript interoperability SDK
+- LangSmith, Braintrust, Langfuse, and OECD-compatible exports
+- SLO, recurrence, release-blocking, and integration-delivery records
+
+### Assurance and Community Governance
+
+- Mutation lab with severity-aware detection policy
+- Rule/model calibration and inconclusive-rate reporting
+- Repeat-run stability with a Wilson 95% confidence interval
+- Neighboring privacy and fix-scope regression guard
+- Reviewed language, location, phrasing, and assistive-need variations
+- Signed proof bundles, evidence pins, and hash-chained audit events
+- Privacy-thresholded recurring-failure radar
+- Encrypted evaluation escrow for independent verification
+
+## Judge Quick Start
+
+### Hosted Demo
+
+No installation or credentials are required:
+
+<https://redressci.onrender.com>
+
+1. Review the four-stage judge path: **Report → Review → Prove → Prevent regression**.
+2. Read the GPT-5.6 card explaining where the model adds value and where human authority remains mandatory.
+3. Select **Start the guided demo**.
+4. Open **Evidence** and **Evaluation** to inspect the approved source and linked assertions.
+5. Open **Validation** and select **Re-run validation**.
+6. Confirm the recorded broken response fails and the correction passes under the same grader policy.
+7. Open **CI export** to inspect or download the portable evaluation, receipt, and GitHub workflow.
+8. Use **View privacy boundary as** to compare Reporter, Reviewer, Developer, Administrator, and Verifier access.
+
+### Local Installation
+
+Requirements: Node.js 22+ and npm. The project is tested on macOS and designed to run on Linux and Windows.
 
 ```bash
-npm install
+git clone https://github.com/ankitlade12/redressci.git
+cd redressci
+npm ci
+
+cp .env.example .env
+# OPENAI_API_KEY is optional for the deterministic synthetic path.
+
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173). No login, API key, or proprietary target is needed for the synthetic judge path.
+Open <http://localhost:5173>. Without an OpenAI key, the seeded comparative demo and deterministic CI runner remain usable.
 
-1. Select **Explore the verified evaluation**.
-2. Inspect the experience, privacy state, approved evidence, and compiled evaluation.
-3. Open **Validation** and select **Run validation gate**.
-4. See version 1.3 fail and version 1.4 pass for evidence-linked reasons.
-5. Open **CI export** to download the portable case and the Redress Receipt.
+### Fresh Report Walkthrough
 
-Use the **View privacy boundary as** selector in the sidebar to compare reporter, reviewer, developer, administrator, and independent-verifier access. The developer view is served without the reporter name or original transcript.
-
-To exercise the full fresh-report lifecycle, select **Report a failure** and use synthetic information. Developers can instead select **Report internal incident** without gaining access to a community reporter's private evidence. Copy-ready examples are in [docs/REPORTING_GUIDE.md](./docs/REPORTING_GUIDE.md).
+Select **Report a failure** and use only synthetic information. Copy-ready examples are in [`docs/REPORTING_GUIDE.md`](docs/REPORTING_GUIDE.md).
 
 1. Submit a transcript and optional private artifact.
-2. Compare the original with the proposed redaction and explicitly approve the shared version.
-3. Add an exact evidence passage, approve expected behavior, and define one forbidden and one required check.
-4. Register the reported broken response and a candidate corrected response.
-5. Compile the portable test and run the comparative gate.
+2. Compare the original with the proposed redaction and approve the shared version.
+3. Add an exact evidence passage and approve a general expected-behavior rule.
+4. Define forbidden, required, and semantic checks tied to that evidence.
+5. Register the reported response and a distinct candidate correction.
+6. Compile the test and run the comparative gate.
+7. Create a private reporter status link or export the CI evaluation.
 
-This path uses the same application rules as the seeded demonstration; evaluation-verified status is not preassigned and does not claim that a deployed system was called.
+## GPT-5.6 Integration
+
+GPT-5.6 is a working product dependency—not a decorative chatbot. The server uses the Responses API with strict JSON schemas for:
+
+- **Multimodal extraction** — recover the visible user/assistant interaction from text or an image while retaining uncertain text
+- **Incident structuring** — propose a title, summary, expected behavior, category, severity, audience, and unanswered questions
+- **Evidence discovery** — search for public authoritative candidates using privacy-approved text only
+- **Semantic grading** — evaluate nuanced behavior using the approved rubric and evidence while preserving inconclusive outcomes
+
+```mermaid
+flowchart LR
+    INPUT[Private report or approved case] --> GPT[GPT-5.6]
+    GPT --> EXTRACT[Structured extraction]
+    GPT --> QUESTIONS[Incident questions]
+    GPT --> SOURCES[Evidence candidates]
+    GPT --> SEMANTIC[Semantic grade]
+    EXTRACT --> REVIEW{Human review}
+    QUESTIONS --> REVIEW
+    SOURCES --> REVIEW
+    REVIEW -->|Approved evidence and rule| COMPILE[Deterministic compiler]
+    SEMANTIC --> RESULT[Pass / fail / inconclusive]
+```
+
+Uploaded content is treated as untrusted data, never model instructions. GPT-5.6 cannot approve privacy, consent, evidence, expected behavior, or verified status. Live AI routes are rate-limited, response sizes are bounded, and credentials remain server-side.
+
+To enable the live AI path locally:
+
+```bash
+cp .env.example .env
+# Set OPENAI_API_KEY and optionally OPENAI_MODEL, then restart npm run dev.
+```
+
+## Reproducible Testing
+
+```bash
+# Complete unit and API integration suite
+npm test
+
+# Strict TypeScript validation
+npm run lint
+
+# Production client build
+npm run build
+
+# Portable corrected-target evaluation
+npm run test:ci
+
+# Demonstrate the expected regression failure
+node --import tsx runner/cli.ts evals/cooling-center-accessibility-001.json --target broken
+```
+
+Current verified result:
+
+```text
+Tests  37 passed (37)
+Lint   passed
+Build  passed
+CI     corrected target passed; known-broken target exits non-zero
+```
+
+Coverage includes privacy gates, ownership, role-token tampering, personal-data leak blocking, evidence approval, dependency invalidation, compilation, comparative validation, immutable grader provenance, signed receipts and proofs, mutation detection, stability, calibration, reporter links, live verification, GitHub workflow generation, privacy thresholds, browser routing, and voice-input behavior.
 
 ## Commands
 
 | Command | Purpose |
-| --- | --- |
-| `npm run dev` | Start the API and Vite development server |
-| `npm run build` | Type-check and create the production client bundle |
-| `npm start` | Serve the production API and built client on port 8787 |
-| `npm test` | Run grading, privacy-gate, compiler, receipt, and API integration tests |
-| `npm run test:ci` | Run the supplied portable evaluation against the corrected demo target |
+|---|---|
+| `npm run dev` | Start the Express API and Vite client in watch mode |
+| `npm run build` | Type-check and produce the production client bundle |
+| `npm start` | Serve the production API and built client on `PORT` or `8787` |
+| `npm test` | Run all 37 product, privacy, compiler, API, and runner tests |
+| `npm run test:ci` | Execute the portable cooling-center evaluation against the corrected target |
+| `npm run lint` | Run strict TypeScript validation without emitting files |
+| `npm run auth:token -- ...` | Issue a signed role token for an authenticated deployment |
 
-To demonstrate a CI failure locally:
-
-```bash
-npx tsx runner/cli.ts evals/cooling-center-accessibility-001.json --target broken
-```
-
-The process exits with status `1` and writes a machine-readable result under `results/`. Change the target to `fixed` and it exits `0`.
-
-## GPT-5.6 integration
-
-The complete synthetic demo is deterministic so judges can test it without credentials. Adding a key enables the live AI path:
-
-```bash
-cp .env.example .env
-# Add OPENAI_API_KEY to .env, then restart the app.
-```
-
-The server defaults to `gpt-5.6`, the alias for GPT-5.6 Sol. Current OpenAI model documentation confirms GPT-5.6 supports text/image input and structured outputs through the Responses API: [OpenAI model guidance](https://developers.openai.com/api/docs/models) and [GPT-5.6 Sol](https://developers.openai.com/api/docs/models/gpt-5.6-sol).
-
-GPT-5.6 is used for:
-
-- extracting a user/assistant interaction from text or an image while preserving uncertain text;
-- generating a structured incident draft and reviewer questions;
-- proposing nuanced semantic grading results grounded only in approved evidence; and
-- returning strict JSON-schema outputs that the application can validate.
-
-AI output never approves privacy, consent, evidence, expected behavior, or verified status. Uploaded content is explicitly treated as untrusted data, not model instructions.
-
-Private attachments are read from encrypted server-side storage. Plain-text files can supply a transcript deterministically; images can supply one when live AI is configured; PDFs remain supporting evidence and require pasted conversation text. Live AI routes are capped by `REDRESSCI_AI_RATE_LIMIT_PER_HOUR` (default `20` per client per hour), and response sizes are bounded.
-
-## Product capabilities
-
-- Guided, non-technical reporter intake.
-- A distinct internal-incident intake for developers with server-enforced ownership and privacy boundaries.
-- Original/artifact separation from anonymized case data.
-- Name, email, phone, and identifier redaction with explicit approval.
-- Multimodal GPT-5.6 extraction interface with uncertainty.
-- Structured incidents with questions instead of hidden assumptions.
-- Versioned evidence and assertion-level citations.
-- Explicit reviewer approval for evidence, expected behavior, assertions, and recorded targets.
-- Declarative, provider-neutral evaluation JSON.
-- Deterministic and semantic assertion types.
-- Live GPT-5.6 semantic grading when configured, with an explicit offline/inconclusive path.
-- Repeatable demo targets and compact run history.
-- Enforced broken-versus-fixed comparative gate.
-- Reporter-safe remediation timeline.
-- CI runner, sample GitHub Actions workflow, and JSON result artifact.
-- Ed25519-signed Redress Receipt with evaluation and proof hashes.
-- One-click synthetic workspace reset.
-- A live remediation loop that calls an allowlisted deployed endpoint, evaluates the real response, and issues a separate signed deployment proof.
-- Private reporter status links with a simplified timeline, update preferences, receipt access, and consent withdrawal.
-- GPT-5.6 evidence-source discovery over privacy-approved case text; every result remains a proposed candidate until human review.
-- A downloadable deployed-target GitHub Actions check and optional GitHub Checks API publishing.
-- A privacy-safe recurring-failure radar with minimum-group suppression.
-- Permission-aware browser voice input for the interaction and impact fields, with editable text, actionable fallbacks, and no stored audio.
-
-### Design-partner foundation
-
-- Signed role tokens for reporter, reviewer, developer, administrator, and independent partner boundaries.
-- Append-only consent changes and withdrawal.
-- AES-256-GCM private artifact encryption and configurable regional metadata.
-- Evidence version graph with exact dependency invalidation and automatic re-review queue.
-- Idempotent background evaluation jobs.
-- Recorded, HTTPS-allowlisted HTTP, and OpenAI-compatible adapters with server-side secret references.
-- LangSmith, Braintrust, Langfuse, and OECD-compatible exports.
-
-### Assurance and community network
-
-- Mutation detection, grader calibration, repeat-run stability with 95% confidence intervals, severity policy, and a neighboring fix-scope guard.
-- Multi-turn/tool trajectory schema and deterministic tool-call assertions.
-- Ed25519 proof bundles, evidence pins, and a verifiable hash-chained audit log.
-- Privacy-safe failure fingerprints and minimum-group suppression for aggregate patterns.
-- Reviewer-controlled counterfactuals and semantic-versioned community packs.
-- Maintainer conflict disclosure, compensation records, locale support, and WCAG 2.2 AA tracking.
-- Encrypted independent-verification escrow.
-- Workspace retention/region/SSO policy, remediation SLOs, recurrence, release blocking, integration delivery records, and non-legal regulatory crosswalks.
-
-## Architecture
+## Project Structure
 
 ```text
-React + TypeScript client
-        │
-        ▼
-Express API ──────► encrypted private artifact boundary (data/encrypted)
-   │
-   ├── privacy + incident workflow
-   ├── evidence-linked compiler
-   ├── deterministic grader
-   ├── optional GPT-5.6 Responses API service
-   ├── comparative validation gate
-   ├── assurance + governed pack engine
-   ├── role, consent, evidence graph, jobs, SLO + recurrence policy
-   └── signed proof/receipt + interoperability exporters
-        │
-        ▼
-portable JSON case ──► standalone Node runner ──► CI result
-        │
-        └────────────► TypeScript SDK / third-party dataset exports
+redressci/
+├── src/                         # React product interface, routing, shared types
+├── server/                      # API, OpenAI integration, privacy, compiler, proof
+├── runner/                      # Portable CLI evaluation runner
+├── sdk/                         # Vendor-neutral TypeScript interoperability client
+├── db/migrations/               # Managed PostgreSQL production schema
+├── evals/                       # Privacy-safe portable evaluation fixtures
+├── fixtures/                    # Synthetic evidence and product data
+├── docs/                        # Research, roadmap, reporting, readiness, demo script
+├── scripts/                     # Operational token tooling
+├── data/                        # Ignored private runtime boundaries; .gitkeep only
+├── .github/workflows/           # Repository and exported CI workflows
+├── RedressCI_Feature_Specification.md
+├── Dockerfile
+├── render.yaml
+├── package.json
+└── .env.example
 ```
 
-Important directories:
+## Configuration
 
-- `src/` — product interface and shared types.
-- `server/` — API, OpenAI integration, compiler, grader, validation gate, and receipts.
-- `runner/` — portable command-line evaluation runner.
-- `sdk/` — small vendor-neutral TypeScript client for proof and recurrence workflows.
-- `db/migrations/` — PostgreSQL production schema spanning all roadmap phases.
-- `evals/` — generated, privacy-safe evaluation fixtures.
-- `fixtures/` — fictional source data and demo targets.
-- `docs/` — competitive research, roadmap, architecture decisions, and demo assets.
-- `.github/workflows/` — runnable sample CI integration.
+The deterministic judge path does not require secrets. For authenticated or integration-enabled environments, copy `.env.example` and configure values in the deployment platform's encrypted secret store.
 
-Judge mode uses resettable process state for reliability. Setting `REDRESSCI_PERSIST=1` enables durable atomic local snapshots. The repository also includes a complete PostgreSQL schema for managed production deployments; encrypted local artifacts, signed identities, idempotent jobs, evidence invalidation, and asynchronous job state are implemented now.
+```bash
+# OpenAI
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-5.6
+REDRESSCI_AI_RATE_LIMIT_PER_HOUR=20
 
-## Assurance Network demo
+# Identity and persistence
+REDRESSCI_AUTH_REQUIRED=1
+REDRESSCI_AUTH_SECRET=
+REDRESSCI_PERSIST=1
+REDRESSCI_STORAGE_REGION=us
 
-Open **Assurance network** in the sidebar, then select **Run full assurance suite**. RedressCI will:
+# Private storage and proof
+REDRESSCI_STORAGE_KEY=
+REDRESSCI_ESCROW_KEY=
+REDRESSCI_SIGNING_PRIVATE_KEY=
 
-1. mutate the known-fixed answer to confirm the evaluation catches approved failure modes;
-2. calculate rule/model agreement and inconclusive rates;
-3. repeat the fixed run according to severity and record a 95% confidence interval;
-4. execute the neighboring privacy/fix-scope guard;
-5. propose governed multilingual and accessibility variations; and
-6. seal hidden evaluation material for the synthetic independent partner.
+# Live deployed-target verification
+REDRESSCI_TARGET_ALLOWLIST=api.example.org
+REDRESSCI_TARGET_TOKEN=
 
-The page then exposes a signed proof bundle and OECD-compatible record without including reporter originals.
+# Optional GitHub Checks publication
+REDRESSCI_GITHUB_REPOSITORY=owner/repository
+REDRESSCI_GITHUB_TOKEN=
+```
 
-## API
+Never commit `.env`. Generated evaluations exclude credentials and original artifacts. Live target URLs must use HTTPS and match `REDRESSCI_TARGET_ALLOWLIST`; credentials are resolved only from named server environment variables.
 
-The main implemented endpoints are:
+## Deploying to Render
+
+The repository includes [`Dockerfile`](Dockerfile) and [`render.yaml`](render.yaml), so Render can deploy directly from `main`.
+
+1. Create a Render web service connected to this repository.
+2. Use the repository's Docker runtime configuration.
+3. Add `OPENAI_API_KEY` and any optional integration secrets in Render—not in Git.
+4. Keep generated auth, storage, and escrow secrets stable across deployments.
+5. Deploy and verify `GET /api/health`.
+6. Keep demo mode isolated from any environment that accepts real sensitive reports.
+
+For a real design-partner deployment, replace local snapshots with transactions over [`db/migrations/001_all_phases.sql`](db/migrations/001_all_phases.sql), move encrypted artifacts to regional object storage and KMS, connect an identity provider, and add backup, monitoring, deletion, and abuse-response operations.
+
+## API Surface
+
+The primary implemented routes include:
 
 ```text
 GET    /api/health
@@ -210,26 +480,18 @@ POST   /api/cases/:id/review-expected-behavior
 PUT    /api/cases/:id/assertions
 PUT    /api/cases/:id/targets
 POST   /api/cases/:id/compile
-POST   /api/cases/:id/runs
 POST   /api/cases/:id/validate
 POST   /api/cases/:id/live-verify
 GET    /api/cases/:id/deployment-proof
-POST   /api/cases/:id/status
 POST   /api/cases/:id/reporter-link
 POST   /api/cases/:id/evidence/discover
-GET    /api/cases/:id/github-check
 GET    /api/cases/:id/github-workflow
 POST   /api/cases/:id/github-check
 GET    /api/cases/:id/export
 GET    /api/cases/:id/receipt
-POST   /api/reset
 
 GET    /api/platform
-GET    /api/platform/readiness
 GET    /api/platform/audit
-POST   /api/cases/:id/consent
-PUT    /api/cases/:id/evidence/:evidenceId/version
-POST   /api/cases/:id/jobs
 POST   /api/cases/:id/assurance
 GET    /api/cases/:id/proof
 POST   /api/platform/proofs/verify
@@ -240,8 +502,6 @@ GET    /api/cases/:id/oecd
 GET    /api/cases/:id/slo
 POST   /api/cases/:id/recurrences
 GET    /api/platform/patterns
-PUT    /api/platform/workspace/policy
-POST   /api/platform/integrations/:id/deliver
 
 GET    /api/public/status/:token
 PUT    /api/public/status/:token/preferences
@@ -249,90 +509,100 @@ GET    /api/public/status/:token/receipt
 POST   /api/public/status/:token/withdraw
 ```
 
-## Production configuration and deployment
+## Safety and Privacy Boundaries
 
-Copy `.env.example` and set secrets through the deployment platform rather than committing them. Important controls are:
-
-```text
-REDRESSCI_PERSIST=1
-REDRESSCI_AUTH_SECRET=<random secret>
-REDRESSCI_AUTH_REQUIRED=1
-REDRESSCI_STORAGE_KEY=<random encryption secret>
-REDRESSCI_ESCROW_KEY=<separate random encryption secret>
-REDRESSCI_SIGNING_PRIVATE_KEY=<stable Ed25519 PEM private key>
-REDRESSCI_STORAGE_REGION=us
-REDRESSCI_TARGET_ALLOWLIST=api.example.org
-REDRESSCI_TARGET_TOKEN=<server-side deployed-target token>
-REDRESSCI_GITHUB_REPOSITORY=owner/repository
-REDRESSCI_GITHUB_TOKEN=<GitHub App installation token>
-```
-
-Live adapters require HTTPS and a hostname in `REDRESSCI_TARGET_ALLOWLIST`; the hostname is rechecked immediately before every request. Credentials are looked up only from named server environment variables. The included `Dockerfile` and `render.yaml` provide a judge-ready deployment definition.
-
-`Verified fixed` is reserved for an actual pass from `POST /api/cases/:id/live-verify`. The earlier recorded-response comparison remains labeled `Evaluation verified`. GitHub workflow generation needs no GitHub credential; posting a check run additionally requires `REDRESSCI_GITHUB_REPOSITORY` and a short-lived GitHub App installation token in `REDRESSCI_GITHUB_TOKEN`.
-
-When `REDRESSCI_AUTH_REQUIRED=1`, anonymous and invalid-token requests cannot inherit demo access. Provision initial short-lived bearer tokens server-side with:
-
-```bash
-npm run auth:token -- admin member-admin "Workspace administrator"
-```
-
-The command signs the role and workspace claims with `REDRESSCI_AUTH_SECRET`; do not run it in a client or expose that secret to the browser.
-
-For a managed production environment, apply [the PostgreSQL migration](db/migrations/001_all_phases.sql), replace the local state adapter with PostgreSQL transactions, and map the encrypted artifact boundary to a regional object store/KMS. SSO and third-party integration delivery require the organization’s identity-provider and app credentials.
-
-## Safety and privacy boundaries
-
-- The public test fixture contains no original reporter identity.
-- Originals are written only under the private artifact boundary and are excluded from Git.
-- Uploaded formats and size are restricted; uploaded code is never executed.
-- Private uploads are encrypted with AES-256-GCM before being written to disk.
-- Credentials stay server-side and are never included in generated tests.
-- Model output cannot directly change consent or verification state.
-- Compilation is blocked when reviewed evidence or assertions still appear to contain personal data.
-- Assertions cannot compile unless they cite approved evidence.
+- All seeded demonstrations and repository fixtures are synthetic.
+- Original evidence and encrypted artifacts are excluded from Git.
+- Reporter ownership is enforced for artifact upload, extraction, download, and privacy approval.
+- Developer access to a community case omits the reporter name, original transcript, artifacts, and unapproved narrative.
+- Uploaded formats and size are restricted; uploaded content is never executed.
+- Model output cannot directly change consent, evidence approval, or verification state.
+- Assertions cannot compile without approved evidence references.
+- Reviewed evidence and assertion values are rescanned for apparent personal data before compilation.
+- Evidence changes invalidate dependent assertions, evaluations, packs, receipts, and proofs.
 - Inconclusive grading remains explicit and cannot silently become a pass.
-- Evidence changes invalidate dependent assertions, evaluations, packs, and receipts instead of silently preserving stale assurance.
+- Aggregate failure groups below the privacy threshold are suppressed.
 - Signed proof and receipt verification fails after payload tampering.
-- Aggregate fingerprint groups below the workspace privacy threshold are suppressed.
-- “Evaluation verified” means one scoped test distinguished approved recorded responses; it does not prove a deployed fix or provide a system-wide safety certification.
-- The MVP never names a real organization or uses a real high-consequence case.
+- `Evaluation verified` is scoped recorded-response proof—not a system-wide safety certification.
 
-## How Codex shaped the project
+## Why RedressCI Is Different
 
-The majority of this product was built with Codex during OpenAI Build Week. Codex helped:
+| Capability | Support ticket | Incident database | Eval platform | RedressCI |
+|---|:---:|:---:|:---:|:---:|
+| Starts with an affected person's experience | ✅ | ✅ | ⚠️ | ✅ |
+| Keeps originals behind a governed privacy boundary | ⚠️ | ⚠️ | ⚠️ | ✅ |
+| Requires human-approved evidence for expected behavior | ❌ | ❌ | ⚠️ | ✅ |
+| Compiles the report into a portable regression test | ❌ | ❌ | ✅ | ✅ |
+| Requires known-broken failure and corrected success | ❌ | ❌ | ⚠️ | ✅ |
+| Separates recorded proof from deployed verification | ❌ | ❌ | ⚠️ | ✅ |
+| Gives the reporter a signed remediation receipt | ❌ | ❌ | ❌ | ✅ |
+| Exports lasting protection into release CI | ❌ | ❌ | ✅ | ✅ |
+| Invalidates tests when supporting evidence changes | ❌ | ❌ | ⚠️ | ✅ |
 
-- translate the product specification into a complete vertical architecture;
-- research the official challenge requirements and adjacent product landscape;
-- implement the React interface, API, evaluation compiler, portable runner, and tests;
-- identify and enforce the highest-risk invariants in code;
-- create the synthetic fixture, CI workflow, competitive analysis, and roadmap; and
-- type-check, test, and iterate on failures discovered during verification.
+The novelty is the combination: **affected-person intake + governed privacy + executable evidence + comparative proof + reporter closure + CI enforcement.** RedressCI connects accountability to the engineering system that can keep a failure from returning.
 
-Human product decisions remained explicit: choosing the affected person as the start of the workflow, requiring evidence before assertions, making privacy approval a hard gate, requiring comparative proof before verification, and positioning RedressCI as integration infrastructure rather than a replacement for observability tools.
+## How Codex Shaped the Product
 
-For the Devpost submission, add the `/feedback` Codex Session ID from the project thread to the submission form.
+The majority of RedressCI was built with Codex during OpenAI Build Week. Codex accelerated the work across product, engineering, research, verification, and deployment:
 
-## Research and roadmap
+- translated the product specification into a complete vertical architecture;
+- researched the challenge requirements and adjacent incident, evaluation, and redress products;
+- implemented the React interface, Express API, compiler, runner, SDK, and proof system;
+- identified high-risk claims and enforced truthful state transitions in server logic;
+- built privacy, workflow, evaluation, platform, routing, and voice regression tests;
+- diagnosed browser navigation, semantic-grader provenance, evidence-review, and dictation failures;
+- created the Docker and Render deployment flow and GitHub review workflow; and
+- iterated on demo clarity, GPT-5.6 visibility, documentation, and submission readiness.
+
+Human product decisions remained explicit: begin with the affected person, require reviewed evidence before assertions, keep private originals separate, demand comparative proof before evaluation verification, and reserve deployed-fix claims for live-system evidence.
+
+## Research and Product Documentation
 
 - [Competitive research and novelty strategy](docs/COMPETITIVE_RESEARCH.md)
 - [Prioritized product roadmap](docs/PRODUCT_ROADMAP.md)
-- [Current implementation status and enforced invariants](docs/IMPLEMENTATION_STATUS.md)
+- [Implementation status and enforced invariants](docs/IMPLEMENTATION_STATUS.md)
 - [Product readiness and adoption audit](docs/PRODUCT_READINESS_AUDIT.md)
+- [Reporting and test-case guide](docs/REPORTING_GUIDE.md)
 - [Three-minute demo script](docs/DEMO_SCRIPT.md)
 - [Original product specification](RedressCI_Feature_Specification.md)
 
-## Hackathon compliance
+## Production Boundary
 
-- Category: Developer Tools.
-- Built with Codex and GPT-5.6.
-- Working, installable project with a credential-free judge path.
-- Public repository may be submitted under the included MIT license.
-- README includes setup, sample data, supported platforms, architecture, and AI collaboration.
-- Video script is under three minutes and explicitly explains Codex and GPT-5.6 usage.
+RedressCI is a working, deployed, end-to-end hackathon product. The hosted environment is intentionally configured as a synthetic judge workspace.
 
-The official deadline is July 21, 2026 at 5:00 PM Pacific. Review the [challenge page](https://openai.devpost.com/) and [official rules](https://openai.devpost.com/rules) before submission.
+Before accepting sensitive external reports, a deployment must add managed identity, durable PostgreSQL storage, regional object storage and KMS, malware and abuse controls, monitoring, backups and restore drills, deletion operations, published privacy and retention policies, and a named response process.
+
+This boundary is deliberate: the product demonstrates credible remediation without pretending that hackathon infrastructure is already a public-interest reporting service.
+
+## Future Enhancements
+
+- Managed organizational identity, invitations, reviewer assignment, and account recovery
+- PostgreSQL-backed multi-tenant case persistence
+- Regional object storage, KMS, retention, deletion, and restoration workflows
+- Real notification delivery and reporter communication preferences
+- Guided GitHub, GitLab, Jira, Linear, Slack, Teams, and webhook integrations
+- Multilingual reporter journeys and formal WCAG 2.2 AA acceptance testing
+- Domain-reviewer assignment, conflicts, compensation, and independent verification
+- Governed community evaluation packs and cross-organization recurrence signals
+- Activation and remediation metrics from real design-partner pilots
+
+## OpenAI Build Week Submission
+
+- **Category:** Developer Tools
+- **Required tools:** Codex and GPT-5.6
+- **Hosted product:** <https://redressci.onrender.com>
+- **Repository:** <https://github.com/ankitlade12/redressci>
+- **Codex session ID:** `019f7687-61f4-7250-9ff7-224899bfc3b6`
+- **License:** MIT
+
+The public demo uses synthetic data, requires no credentials, and exposes a guided testing path. The video script is designed to remain below three minutes while explicitly demonstrating both Codex's contribution and GPT-5.6's role in the running product.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+[MIT](LICENSE) © 2026 Ankit Hemant Lade, Sai Krishna Jasti, and RedressCI contributors.
+
+---
+
+**Built for OpenAI Build Week — Developer Tools.**
+
+*Report the failure. Review the evidence. Prove the fix. Prevent the regression.*
